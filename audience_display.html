@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弹幕动画效果 - 弹出并滚动</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #222; /* Dark background as seen in screenshot */
+            color: white; /* Default text color */
+        }
+
+        #danmaku-container {
+            position: relative; /* Or fixed, depending on desired layering */
+            width: 100vw; /* Full viewport width */
+            height: 100vh; /* Full viewport height */
+            pointer-events: none; /* Allow clicks to pass through */
+        }
+
+        .danmaku-item {
+            position: absolute;
+            white-space: nowrap; /* Prevent text wrapping */
+            font-size: 2em; /* Adjust font size as needed */
+            font-weight: bold;
+            text-shadow: 
+                -1px -1px 0 #000,  
+                 1px -1px 0 #000,
+                -1px 1px 0 #000,
+                 1px 1px 0 #000; /* Simple black outline for readability */
+            color: white; /* Default danmaku color */
+             /* Add more styling like background, padding, border-radius if needed */
+        }
+
+        /* Animation for moving from right to left */
+        @keyframes moveAcross {
+            from {
+                transform: translateX(100vw); /* Start outside right edge */
+            }
+            to {
+                transform: translateX(-100%); /* End outside left edge */
+            }
+        }
+
+        /* Example color classes for different types of danmaku */
+        .danmaku-item.welcome { color: #ffff00; } /* Yellow */
+        .danmaku-item.roast { color: #ff4500; } /* OrangeRed */
+        .danmaku-item.script { color: #00ffff; } /* Cyan */
+        .danmaku-item.info { color: #add8e6; } /* LightBlue */
+        /* Add more classes as needed */
+
+    </style>
+</head>
+<body>
+    <div id="danmaku-container">
+        <!-- Danmaku elements will be added here by JavaScript -->
+    </div>
+
+    <script>
+        // --- Server Ports ---
+        // Match this with server.py configuration
+        const WEBSOCKET_PORT = 8765;
+
+        // --- WebSocket Setup ---
+        // Use window.location.hostname for flexibility
+        const wsHost = window.location.hostname || 'localhost'; 
+        const wsUrl = `ws://${wsHost}:${WEBSOCKET_PORT}/audience`;
+
+        let websocket;
+        let reconnectTimer = null;
+        const reconnectDelay = 3000; // 3 seconds
+
+        // --- DOM Elements ---
+        const danmakuContainer = document.getElementById('danmaku-container');
+
+        // Function to connect to WebSocket
+        function connect() {
+             console.log("Audience: connect() called."); // DEBUG
+            if (websocket && (websocket.readyState === WebSocket.OPEN || websocket.readyState === WebSocket.CONNECTING)) {
+                console.log("Audience: WebSocket is already connecting or open. Aborting connect attempt."); // DEBUG
+                return;
+            }
+             // Clear any pending reconnect timer
+             if(reconnectTimer) {
+                 console.log("Audience: Clearing existing reconnect timer."); // DEBUG
+                 clearTimeout(reconnectTimer);
+                 reconnectTimer = null;
+             }
+
+            console.log("Audience: Creating new WebSocket instance:", wsUrl); // DEBUG
+            websocket = new WebSocket(wsUrl);
+
+            websocket.onopen = () => {
+                console.log("Audience: WebSocket connected."); // DEBUG
+                 // Send registration message
+                console.log("Audience: Sending registration message."); // DEBUG
+                sendMessage({ action: "register", client_type: "audience" });
+            };
+
+            websocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("Audience: Received from server:", data); // DEBUG
+
+                    // 清理消息类型，去除可能存在的前后空格
+                    const messageType = typeof data.type === 'string' ? data.type.trim() : data.type;
+
+                    switch (messageType) { // 使用清理后的 messageType
+                        case "registration_success":
+                            console.log(`Audience: Successfully registered as ${data.client_type}.`); // DEBUG
+                            // Optional: Request initial state if needed.
+                            // For danmaku display, might not need state unless you want to show current script line immediately.
+                            // Let's assume audience just waits for danmaku/display messages.
+                            break;
+
+                        case "danmaku":
+                            // Handle incoming danmaku message
+                            // data.text contains the danmaku string
+                            // data.duration_ms might contain the animation duration
+                             console.log("Audience: Received danmaku:", data.text); // DEBUG
+                            displayDanmaku(data.text, data.duration_ms, data.is_roast); // Pass is_roast flag
+
+                            break;
+
+                        case "audience_display":
+                             // Handle messages intended to update the audience display (e.g. script line)
+                             // data.line contains the current script line
+                             console.log("Audience: Received audience_display update:", data); // DEBUG
+                             // Decide how to display this. Maybe overlay on top of danmaku?
+                             // For now, let's just log or ignore, as the request was only for danmaku animation.
+                             // If you need to display current script line for audience, this is the place to handle it.
+                             break;
+
+                         case "info":
+                              console.log("Audience: Received info message:", data.message); // DEBUG
+                             // Optionally display info messages temporarily
+                             // displayInfoMessage(data.message, data.duration_ms); // Implement a display function
+                             break;
+
+                         case "warning":
+                              console.log("Audience: Received warning message:", data.message); // DEBUG
+                             // Optionally display warning messages temporarily
+                             break;
+
+                         case "error":
+                              console.error("Audience: Received error message:", data.message); // DEBUG
+                             // Optionally display error messages temporarily
+                             break;
+
+                         case "pong":
+                             // Received pong from server heartbeat. Just acknowledge it.
+                             // console.log("Audience: Received pong."); // DEBUG - too noisy
+                             break;
+
+                        default:
+                            console.warn("Audience: Received unknown message type from server:", messageType, data); // DEBUG // 在日志中也使用 messageType
+                    }
+                } catch (e) {
+                    console.error("Audience: Error parsing or processing WebSocket message:", e, event.data); // DEBUG
+                }
+            };
+
+            websocket.onclose = (event) => {
+                console.log("Audience: Disconnected from WebSocket.", event.code, event.reason); // DEBUG
+                // Attempt to reconnect after a delay, only if not already scheduled
+                if (!reconnectTimer) {
+                    reconnectTimer = setTimeout(connect, reconnectDelay); 
+                    console.log(`Audience: Attempting to reconnect in ${reconnectDelay / 1000} seconds...`); // DEBUG
+                }
+            };
+
+            websocket.onerror = (error) => {
+                console.error("Audience: WebSocket Error:", error); // DEBUG
+                // The 'error' event is often followed by the 'close' event.
+                // The 'close' handler is responsible for attempting reconnection.
+            };
+        }
+
+        // Helper function to send WebSocket messages
+        function sendMessage(message) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify(message));
+                 console.log("Audience: Sent via WebSocket:", message); // DEBUG
+            } else {
+                console.warn("Audience: WebSocket is not open. Cannot send message:", message); // DEBUG
+            }
+        }
+
+        // Function to display danmaku on the screen
+        function displayDanmaku(text, duration_ms = 22000, isRoast = false) { // Default duration 22s
+            console.log(`Audience: Displaying danmaku: "${text}" with duration ${duration_ms}ms, isRoast: ${isRoast}`); // DEBUG
+
+            const danmakuItem = document.createElement('div');
+            danmakuItem.classList.add('danmaku-item');
+            
+            // Add class based on type (optional, for styling)
+            if(isRoast) {
+                danmakuItem.classList.add('roast');
+            } else {
+                 // Default color or other classes if needed
+                 // danmakuItem.classList.add('welcome'); // Example: Add welcome class if not roast
+            }
+            // Ensure a default color if no specific class is added or defined in CSS
+             if (!danmakuItem.classList.length) {
+                  danmakuItem.style.color = 'white'; // Default color if no type class matches
+             }
+
+
+            danmakuItem.textContent = text;
+
+            // Randomize vertical position (lane)
+            // Adjust the multiplier based on your desired number of lanes and font size
+            const laneCount = 8; // Example: divide screen height into 8 lanes
+            const laneHeight = window.innerHeight / laneCount;
+            const randomLane = Math.floor(Math.random() * laneCount);
+            danmakuItem.style.top = `${randomLane * laneHeight}px`;
+
+            // Set animation
+            const animationDuration = duration_ms / 1000; // Convert milliseconds to seconds
+            danmakuItem.style.animation = `moveAcross ${animationDuration}s linear forwards`;
+
+            // Add danmaku to the container
+            danmakuContainer.appendChild(danmakuItem);
+
+            // Remove danmaku element after animation finishes
+            danmakuItem.addEventListener('animationend', () => {
+                danmakuItem.remove();
+                console.debug("Audience: Danmaku element removed after animation."); // DEBUG
+            });
+
+            // Fallback removal in case animationend doesn't fire (e.g., element hidden or display none)
+             setTimeout(() => {
+                 if (danmakuContainer.contains(danmakuItem)) {
+                     danmakuItem.remove();
+                      console.debug("Audience: Danmaku element removed via fallback timeout."); // DEBUG
+                 }
+             }, duration_ms + 1000); // Add a small buffer
+
+
+        }
+
+
+        // --- Initial Connection ---
+        // Wait for the DOM to be fully loaded before attempting to connect
+        document.addEventListener('DOMContentLoaded', (event) => {
+            console.log('Audience: DOM fully loaded. Attempting WebSocket connection.'); // DEBUG
+            connect();
+        });
+
+    </script>
+</body>
+</html>
+
+// 假设您的 WebSocket 连接和消息处理函数如下所示
+// 函数名可能是 connectWebSocket, setupWebSocket 或其他
+function yourWebSocketSetupFunction() {
+    ws.onmessage = function(event) {
+        const message = JSON.parse(event.data);
+        // 下面这行 console.log 对应截图中的 audience_display.html:270
+        console.log("Audience: Received from server:", message); 
+
+        switch (message.type) {
+            case "registration_success":
+                // 下面这行 console.log 对应截图中的 audience_display.html:274
+                console.log("Audience: Successfully registered as audience.");
+                break;
+
+            // 其他已有的 case ...
+            // ... existing code for registration_success ...
+                break;
+
+            // 新增对 "danmaku" 消息类型的处理
+            case "danmaku":
+                console.log(`Audience: Displaying danmaku: "${message.text}" (duration: ${message.duration_ms}ms, is_roast: ${message.is_roast})`);
+                
+                // 这里是显示弹幕的逻辑。
+                // 您需要根据页面的实际HTML结构来显示弹幕。
+                // 下面是一个简单的示例，假设您有一个ID为 "danmaku-area" 的 div 用于显示弹幕。
+                // 您可能需要创建这个 div，或者使用您页面中已有的弹幕容器。
+                const danmakuArea = document.getElementById('danmaku-area'); // 请确保这个元素存在
+                if (danmakuArea) {
+                    const danmakuElement = document.createElement('div');
+                    danmakuElement.className = 'danmaku-entry'; // 用于CSS样式和动画
+                    danmakuElement.textContent = message.text;
+                    
+                    // 可以根据 message.is_roast 来应用不同的样式
+                    if (message.is_roast) {
+                        danmakuElement.classList.add('roast');
+                    }
+                    
+                    danmakuArea.appendChild(danmakuElement);
+                    
+                    // 弹幕动画和移除逻辑
+                    // 例如，让弹幕滚动或在一定时间后消失
+                    // 这是一个非常基础的实现，您可能需要更复杂的动画库
+                    danmakuElement.style.position = 'absolute';
+                    danmakuElement.style.left = '100%';
+                    danmakuElement.style.top = Math.random() * 80 + '%'; // 随机高度
+                    danmakuElement.style.whiteSpace = 'nowrap';
+                    danmakuElement.style.transition = `transform ${ (message.duration_ms || 7000) / 1000 }s linear`;
+                    danmakuElement.style.transform = 'translateX(-100vw)'; // 假设弹幕区域宽度为100vw
+
+                    setTimeout(() => {
+                        if (danmakuArea.contains(danmakuElement)) {
+                           danmakuArea.removeChild(danmakuElement);
+                        }
+                    }, message.duration_ms || 7000); // 使用消息中的时长，或默认7秒
+                } else {
+                    console.warn("Audience: 'danmaku-area' element not found. Cannot display danmaku.");
+                }
+                break;
+
+            default:
+                // 下面这行 console.warn 对应截图中的 audience_display.html:320
+                console.warn(`Audience: Received unknown message type from server: ${message.type}`, message);
+                break;
+        }
+    };
+
+    ws.onerror = function(error) {
+        // 下面这行 console.error 对应截图中的 audience_display.html:340
+        console.error("Audience: WebSocket Error:", error);
+    };
+
+    ws.onclose = function(event) {
+        // 下面这行 console.log 对应截图中的 audience_display.html:330
+        console.log(`Audience: Disconnected from WebSocket. Code: ${event.code}, Reason: ${event.reason || 'No reason given'}`);
+        // ... existing reconnect logic which includes lines 335 and 252 ...
+    };
+    
+    // 确保在页面加载后调用了您的 WebSocket 初始化函数
+    // 例如: window.onload = yourWebSocketSetupFunction;
+    // 或者如果使用DOMContentLoaded:
+    // document.addEventListener('DOMContentLoaded', yourWebSocketSetupFunction);
+}
+
+// ... existing code ...
+</script>
+</body>
+</html>

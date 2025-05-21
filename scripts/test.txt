@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主播提词器控制端</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 800px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; margin-top: 0.8em; margin-bottom: 0.4em; }
+        .control-panel, .script-info, .current-line-display, .status-messages, .navigation-controls, .roast-controls, .danmaku-section, .reversal-section, .captions-section { /* Added new sections */
+            margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;
+        }
+        #currentLine { font-size: 1.8em; color: #007bff; margin-bottom: 10px; min-height: 50px; white-space: pre-wrap; }
+        #currentPrompt { font-size: 1.2em; color: #28a745; font-style: italic; min-height: 30px; white-space: pre-wrap; }
+        button { padding: 10px 15px; margin: 5px 5px 5px 0; border: none; border-radius: 4px; cursor: pointer; background-color: #007bff; color: white; font-size: 1em; }
+        button:hover:not(:disabled) { background-color: #0056b3; } /* Add not(:disabled) */
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .status { color: #dc3545; } .info { color: #17a2b8; } .warning { color: #ffc107; } .success { color: #28a445; } /* Slightly adjusted success color */
+        .event-index { font-size: 0.9em; color: #6c757d; text-align: right; }
+        
+        #script-browser { display: flex; flex-direction: column; gap: 10px; }
+        #script-path-breadcrumb { font-weight: bold; color: #555; margin-bottom: 5px; }
+        #script-select { width: 100%; min-height: 100px; border: 1px solid #ccc; border-radius: 4px; padding: 5px; box-sizing: border-box; }
+        .script-browse-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .script-browse-controls button { margin-top: 0; margin-bottom: 0; }
+    
+        .roast-controls div, .danmaku-section div, .reversal-section div, .captions-section div { /* Added new sections divs */
+             margin-bottom: 10px; display: flex; flex-wrap: wrap; align-items: center;
+        }
+        .roast-controls label, .danmaku-section label, .reversal-section label, .captions-section label { /* Added new sections labels */
+             margin-right: 10px; 
+        }
+        .roast-controls input[type="text"], 
+        .danmaku-section input[type="text"], 
+        .reversal-section input[type="text"], /* Added new sections inputs */
+        .captions-section input[type="text"] { /* Added new sections inputs */
+             padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; min-width: 150px; 
+        }
+        #roastStatus { font-style: italic; color: #555; margin-top: 10px; white-space: pre-wrap; min-height: 20px;}
+        
+        /* Shared Danmaku Output Area */
+        .danmaku-section h4, .reversal-section h4, .captions-section h4 { /* Added new sections h4 */
+             margin-top: 15px; margin-bottom: 5px; 
+        }
+        #danmaku_output_area { 
+            margin-top: 10px; 
+            white-space: pre-wrap; 
+            background-color: #e9ecef; 
+            padding: 10px; 
+            border-radius: 4px; 
+            min-height: 50px; 
+            color: #333; 
+            max-height: 300px; 
+            overflow-y: auto; 
+            border: 1px solid #ccc;
+            cursor: text; /* Default cursor */
+        }
+         #danmaku_output_area.copyable {
+             cursor: copy;
+         }
+
+        /* Adjust search-container to only wrap the first input and its results */
+        .danmaku-section .search-container { 
+            position: relative; 
+            flex-grow: 1; 
+            min-width: 150px;
+        }
+         /* Simple input container for others */
+         .input-container {
+             flex-grow: 1;
+             min-width: 150px;
+             /* Add margin/padding if needed to match search-container visual spacing */
+         }
+
+
+        .search-results {
+            position: absolute;
+            top: 100%; /* Position below the input */
+            left: 0;
+            right: 0;
+            z-index: 10; /* Ensure it's above other content */
+            border: 1px solid #ccc;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            max-height: 150px; /* Limit height */
+            overflow-y: auto; /* Add scroll if needed */
+            border-radius: 4px;
+            margin-top: 2px; /* Small gap between input and dropdown */
+        }
+        .search-results div {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 0; /* Override flex margin */
+            display: block; /* Make divs block level for full width clicking */
+        }
+        .search-results div:last-child {
+            border-bottom: none;
+        }
+        .search-results div:hover {
+            background-color: #f0f0f0;
+        }
+        /* Specific input styling - keep flex-grow */
+        .danmaku-section input[type="text"], .reversal-section input[type="text"], .captions-section input[type="text"] { flex-grow: 1;} 
+        /* Specific button styling - keep margins */
+        .danmaku-section div > button, .reversal-section div > button, .captions-section div > button { 
+             margin-top: 5px; margin-bottom: 5px;
+        }
+
+        #connectionStatusCircle {
+             display: inline-block;
+             width: 12px;
+             height: 12px;
+             border-radius: 50%;
+             margin-left: 10px;
+             vertical-align: middle; /* Align with text */
+             background-color: gray; /* Default color */
+        }
+         #autoSendDanmakuBtn {
+            background-color: #28a745; /* Green color */
+            color: white;
+         }
+          #autoSendDanmakuBtn:hover:not(:disabled) {
+             background-color: #218838; /* Darker green on hover */
+          }
+
+         /* Style for multi-part items in the output area */
+         .danmaku-item-part {
+             margin-bottom: 10px; /* Space between parts of one item */
+             padding: 8px;
+             border: 1px dashed #ccc; /* Visual separator */
+             border-radius: 4px;
+             background-color: #f1f1f1;
+             color: #333; /* Ensure text is visible against light background */
+         }
+         .danmaku-item-part strong {
+             color: #000; /* Make labels stand out */
+         }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>主播提词器控制端</h1>
+
+        <div class="status-messages">
+            <h2>状态/消息 <span id="connectionStatusCircle"></span></h2>
+            <div id="statusMessage" class="status">未连接到服务器</div>
+        </div>
+
+        <div class="control-panel">
+            <h2>脚本控制</h2>
+            <div id="script-browser">
+                <div id="script-path-breadcrumb">选择脚本来源</div>
+                <div class="script-browse-controls">
+                    <button id="script-browse-up-btn" style="display: none;">返回上一级</button>
+                </div>
+                <select id="script-select" size="8">
+                    <option value="">-- 等待连接 --</option>
+                </select>
+                <button id="load-selected-script-btn" disabled>加载选中脚本</button>
+            </div>
+        </div>
+
+        <div class="script-info">
+            <h3>当前脚本: <span id="scriptName">未加载</span></h3>
+            <h3>进度: <span id="progress">N/A</span></h3>
+        </div>
+
+        <div class="current-line-display">
+            <h2>当前台词</h2>
+            <div id="currentLine">等待加载脚本...</div>
+            <h2>提示</h2>
+            <div id="currentPrompt">-</div>
+            <div class="event-index">事件: <span id="currentEventIndex">-</span> / <span id="totalEvents">-</span></div>
+        </div>
+        
+        <div class="navigation-controls">
+            <h2>导航</h2>
+            <button id="prevEventBtn" disabled>上一条 (PgUp)</button>
+            <button id="nextEventBtn" disabled>下一条 (Space/PgDn)</button>
+        </div>
+
+        <div class="roast-controls">
+            <h2>怼黑粉模式 (随机语录)</h2>
+            <div>
+                <label for="roastTargetName">黑粉昵称:</label>
+                <input type="text" id="roastTargetName" placeholder="输入黑粉昵称">
+                <button id="startRoastBtn">开始怼人序列 (3条)</button>
+            </div>
+            <button id="advanceRoastBtn" style="display: none; background-color: #ffc107; color: black;">发送弹幕并看下一提示 (空格)</button>
+            <div id="roastStatus" style="white-space: pre-wrap; min-height: 20px;"></div>
+             <p><small>注: 该模式会随机选取语录，将语录中**最后一个全角逗号（，）前的部分**（包含 {} 参数）替换后作为弹幕发送给观众，**最后一个全角逗号（，）后的部分**将显示在“当前台词”区域作为您的提示。请确保数据库中的语录使用全角逗号分隔。</small></p>
+        </div>
+
+        <!-- 获取主播预设弹幕区域 (Welcome/Mock Danmaku) -->
+        <div class="danmaku-section">
+            <h2>获取主播预设弹幕 (欢迎/吐槽)</h2>
+            <div>
+                <label for="streamer_search_input">主播名:</label>
+                 <!-- This search container is for the first input and its results dropdown -->
+                <div class="search-container"> 
+                    <input type="text" id="streamer_search_input" placeholder="输入主播名进行搜索...">
+                    <!-- This is the shared search results dropdown -->
+                    <div id="streamer_search_results" class="search-results" style="display: none;">
+                         <!-- Search results will be populated here -->
+                    </div>
+                </div>
+            </div>
+            <div> <!-- Separate div for buttons -->
+                 <button id="fetch_welcome_danmaku_btn">获取欢迎弹幕列表 (10条)</button>
+                 <button id="fetch_roast_danmaku_btn">获取吐槽弹幕列表 (10条)</button>
+                 <!-- New button for auto send (Applies to Welcome/Mock fetched above) -->
+                 <button id="autoSendDanmakuBtn">自动发送欢迎/吐槽弹幕</button>
+            </div>
+            
+            <h4>弹幕结果 (点击复制):</h4>
+            <div id="danmaku_output_area">请先搜索并选择主播，然后获取弹幕。</div>
+            <p><small>注: 从上方列表获取弹幕后，您可以手动复制弹幕内容并发送到直播间或使用其他发送弹幕的工具，或者点击“自动发送”按钮通过服务器发送给观众页面。**这个区域也用于显示下方模块的获取结果。**</small></p>
+        </div>
+        <!-- 区域结束 -->
+
+        <!-- NEW: Reversal_Copy Section -->
+        <div class="reversal-section">
+             <h2>加载主播反转 (Reversal_Copy)</h2>
+             <div>
+                 <label for="streamer_search_input_reversal">主播名:</label> 
+                 <!-- Use a simple input container -->
+                 <div class="input-container"> 
+                     <input type="text" id="streamer_search_input_reversal" placeholder="输入主播名"> 
+                 </div>
+                 <button id="fetch_reversal_btn">获取反转语录 (10条)</button>
+             </div>
+             <p><small>注: 获取的结果会显示在上方的“弹幕结果”区域。</small></p>
+        </div>
+        <!-- NEW Section End -->
+
+        <!-- NEW: Social_Topics Section -->
+        <div class="captions-section">
+             <h2>加载主题/段子 (Social_Topics)</h2> 
+             <div>
+                 <label for="streamer_search_input_captions">主题名:</label> 
+                 <!-- Use a simple input container -->
+                 <div class="input-container"> 
+                      <input type="text" id="streamer_search_input_captions" placeholder="输入主题名"> 
+                 </div>
+                 <button id="fetch_captions_btn">获取主题/段子数据 (10条)</button>
+             </div>
+              <p><small>注: 获取的结果会显示在上方的“弹幕结果”区域。</small></p>
+        </div>
+        <!-- NEW Section End -->
+
+
+    </div> <!-- end .container -->
+
+    <script>
+        // --- Server Ports ---
+        // Match these with server.py configuration
+        const FLASK_PORT = 5000;
+        const WEBSOCKET_PORT = 8765;
+
+        // --- WebSocket Setup ---
+        // Use window.location.hostname for flexibility, defaults to 'localhost'
+        const wsHost = window.location.hostname || 'localhost'; 
+        const wsUrl = `ws://${wsHost}:${WEBSOCKET_PORT}/presenter`;
+
+        // API URL - explicitly construct using http and the determined host and Flask port
+        const apiHost = window.location.hostname || 'localhost'; 
+        const apiUrl = `http://${apiHost}:${FLASK_PORT}/api`; 
+
+
+        let websocket;
+        let currentBrowsePathContext = null;
+        let reconnectTimer = null;
+        const reconnectDelay = 3000; // 3 seconds
+
+        // --- DOM Elements ---
+        const scriptSelect = document.getElementById('script-select');
+        const loadSelectedScriptBtn = document.getElementById('load-selected-script-btn');
+        const scriptBrowseUpBtn = document.getElementById('script-browse-up-btn');
+        const scriptPathBreadcrumb = document.getElementById('script-path-breadcrumb');
+        
+        const prevEventBtn = document.getElementById('prevEventBtn');
+        const nextEventBtn = document.getElementById('nextEventBtn');
+        const scriptNameDisplay = document.getElementById('scriptName');
+        const progressDisplay = document.getElementById('progress');
+        const currentLineDisplay = document.getElementById('currentLine');
+        const currentPromptDisplay = document.getElementById('currentPrompt');
+        const statusMessageDisplay = document.getElementById('statusMessage');
+        const connectionStatusCircle = document.getElementById('connectionStatusCircle'); // Get the circle element
+        const currentEventIndexDisplay = document.getElementById('currentEventIndex');
+        const totalEventsDisplay = document.getElementById('totalEvents');
+
+        const roastTargetNameInput = document.getElementById('roastTargetName');
+        const startRoastBtn = document.getElementById('startRoastBtn');
+        const advanceRoastBtn = document.getElementById('advanceRoastBtn');
+        const roastStatusDisplay = document.getElementById('roastStatus');
+
+        // --- DOM Elements for Danmaku Fetch Feature (Welcome/Mock) ---
+        const streamerSearchInput = document.getElementById('streamer_search_input');
+        const streamerSearchResultsDiv = document.getElementById('streamer_search_results'); // This is for the suggestions dropdown
+        const fetchWelcomeBtn = document.getElementById('fetch_welcome_danmaku_btn');
+        const fetchRoastBtn = document.getElementById('fetch_roast_danmaku_btn');
+        const danmakuOutputArea = document.getElementById('danmaku_output_area');
+        const autoSendDanmakuBtn = document.getElementById('autoSendDanmakuBtn');
+
+        // --- NEW DOM Elements for Reversal_Copy and Social_Topics Fetch Feature ---
+        // These are now separate input fields with unique IDs
+        const streamerSearchInputReversal = document.getElementById('streamer_search_input_reversal'); 
+        const streamerSearchInputCaptions = document.getElementById('streamer_search_input_captions'); 
+        const fetchReversalBtn = document.getElementById('fetch_reversal_btn'); 
+        const fetchCaptionsBtn = document.getElementById('fetch_captions_btn'); 
+
+        // Keep track of the last focused search input to know where to put selected suggestion
+        let lastFocusedSearchInput = null;
+
+
+        let searchDebounceTimer; // Timer for streamer search debounce
+
+        let isInRoastMode = false; // Flag for the anti-fan roast sequence mode
+
+        // --- Utility Functions ---
+
+        // Helper function to send WebSocket messages
+        function sendMessage(message) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify(message));
+                console.log("Presenter: Sent via WebSocket:", message); // Log successful send
+            } else {
+                console.warn("Presenter: WebSocket is not open. Cannot send message:", message); // Log failure to send
+                setStatus("WebSocket未连接，无法发送消息。", "status");
+            }
+        }
+
+
+        function setStatus(message, type = "info") {
+            statusMessageDisplay.textContent = message;
+            statusMessageDisplay.className = type; // 'info', 'status', 'warning', 'success'
+             // Update circle color based on type and connection state
+             if (websocket && websocket.readyState === WebSocket.OPEN) {
+                 connectionStatusCircle.style.backgroundColor = 'green';
+             } else if (websocket && websocket.readyState === WebSocket.CONNECTING) {
+                 connectionStatusCircle.style.backgroundColor = 'gray';
+             } else { // Neither open nor disconnected, likely closing or closed
+                 connectionStatusCircle.style.backgroundColor = 'red'; // Assume disconnected if not open/connecting
+             }
+             // Optional: also use type for color, overriding connection state for errors/warnings
+              if (type === "status") { // Often indicates error or disconnected state
+                 connectionStatusCircle.style.backgroundColor = 'red';
+              } else if (type === "warning") {
+                 connectionStatusCircle.style.backgroundColor = 'orange';
+              } else if (type === "success" && websocket && websocket.readyState === WebSocket.OPEN) {
+                  // Only show green success if actually connected
+                  connectionStatusCircle.style.backgroundColor = 'green';
+              }
+              // For 'info' or other types, the connection state color takes precedence
+        }
+
+        function enableScriptNavigation(enabled, currentIndex = -1, totalEvents = 0) {
+             // Always disable script navigation if in any special mode (like Roast Mode)
+             if (isInRoastMode) {
+                  prevEventBtn.disabled = true;
+                  nextEventBtn.disabled = true;
+                  return;
+             }
+
+            if (enabled && totalEvents > 0) {
+                // Enable prev if index is 0 or greater (can go back from 0 to -1)
+                prevEventBtn.disabled = (currentIndex < 0); 
+                nextEventBtn.disabled = (currentIndex >= totalEvents - 1); // Disable next if at last event
+            } else {
+                prevEventBtn.disabled = true;
+                nextEventBtn.disabled = true;
+            }
+        }
+
+        function updateProgress(currentIndex, totalEvents) {
+            if (totalEvents > 0 && currentIndex !== undefined && currentIndex > -1) {
+                progressDisplay.textContent = `事件 ${currentIndex + 1} / ${totalEvents}`;
+            } else if (totalEvents > 0 && currentIndex === -1) {
+                 progressDisplay.textContent = `准备就绪 (共 ${totalEvents} 事件)`;
+            }
+            else {
+                progressDisplay.textContent = "N/A";
+            }
+             // Always update navigation button states based on current index and total
+             enableScriptNavigation(totalEvents > 0, currentIndex, totalEvents);
+        }
+
+        function connect() {
+            if (websocket && (websocket.readyState === WebSocket.OPEN || websocket.readyState === WebSocket.CONNECTING)) {
+                console.log("Presenter: WebSocket is already connecting or open.");
+                return;
+            }
+             // Clear any pending reconnect timer before attempting a new connection
+             if(reconnectTimer) {
+                 clearTimeout(reconnectTimer);
+                 reconnectTimer = null;
+             }
+
+            websocket = new WebSocket(wsUrl);
+            console.log("Presenter: Attempting WebSocket connection to:", wsUrl);
+            setStatus("-- 连接中... --", "info"); // Set status to connecting
+            disableAllControls(); // Disable ALL controls initially
+
+            websocket.onopen = () => {
+                setStatus("已连接到提词服务器。", "success");
+                console.log("Presenter: WebSocket connected.");
+                // Send registration message first thing on open
+                sendMessage({ action: "register", client_type: "presenter" });
+                // enableControlsOnConnect() will be called after successful registration message from server
+                 // Send pong periodically - handled by server's cleanup now, but client can still send pings proactively
+                // sendMessage({ type: "pong" }); // Sent on open, server heartbeats will handle subsequent pings/pongs
+            };
+
+            websocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("Presenter: Received from server:", data);
+
+                    // Flag to re-enable auto-send related buttons after processing this message
+                    let reEnableAutoSendRelated = false;
+
+
+                    switch (data.type) {
+                        case "registration_success": // Handle successful registration
+                            console.log(`Presenter: Successfully registered as ${data.client_type}.`);
+                            setStatus(`已作为 ${data.client_type} 成功注册。`, "success");
+                            enableAllControls(); // Enable ALL controls after successful registration (default state)
+
+                            // Server should automatically send script options and current state after registration
+                            // These messages will update the UI upon arrival (script_options_update, script_loaded_presenter).
+
+                            break;
+                        case "script_options_update":
+                            currentBrowsePathContext = data.current_path;
+                            scriptPathBreadcrumb.textContent = data.breadcrumb.join(' > ');
+                            scriptSelect.innerHTML = '';
+                            if (data.options && data.options.length > 0) {
+                                data.options.forEach(item => {
+                                    const option = document.createElement('option');
+                                    option.value = item.path;
+                                    option.textContent = item.name;
+                                    option.dataset.type = item.type; // 'browse_dir' or 'script_file'
+                                    scriptSelect.appendChild(option);
+                                });
+                            } else {
+                                scriptSelect.innerHTML = '<option value="">-- 此目录为空 --</option>';
+                            }
+                            // Show "up" if not in the root directory "."
+                            if (currentBrowsePathContext && currentBrowsePathContext !== "." && data.breadcrumb.length > 1) {
+                                scriptBrowseUpBtn.style.display = 'inline-block';
+                            } else {
+                                scriptBrowseUpBtn.style.display = 'none';
+                            }
+                            // Load button disabled by default, enabled on valid file selection change event
+                            loadSelectedScriptBtn.disabled = true; 
+                            break;
+
+                         case "script_loaded": 
+                             // This type might be sent to all clients including presenter
+                             // when a script is loaded. Use script_loaded_presenter for presenter-specific updates.
+                             console.log(`Presenter: Script loaded notification: ${data.script_name}`);
+                             // Do not update main UI from this, rely on presenter_generic_update or script_loaded_presenter.
+                             break;
+
+
+                        case "script_loaded_presenter": // Initial state after loading script OR on connection/refresh
+                             // Exit special modes when a new script is loaded
+                             if (isInRoastMode) exitRoastMode(false); // Donm't notify server if just switching script
+
+                            scriptNameDisplay.textContent = data.filename || "未知脚本";
+                            totalEventsDisplay.textContent = data.total_events !== undefined ? data.total_events : "-";
+                            
+                            // Update current line/prompt and index based on the state sent by server
+                            currentEventIndexDisplay.textContent = data.event_index !== undefined && data.event_index > -1 ? data.event_index + 1 : "-";
+                            currentLineDisplay.textContent = data.current_line || "加载中..."; // Use server's provided line
+                            currentPromptDisplay.textContent = data.current_prompt || "-"; // Use server's provided prompt
+
+
+                            updateProgress(data.event_index, data.total_events);
+
+
+                            if (data.total_events === 0) {
+                                setStatus(`脚本 "${data.filename}" 加载成功，但内容为空。`, "warning");
+                            } else {
+                                setStatus(`脚本 "${data.filename}" 已加载，共 ${data.total_events} 个事件。`, "success"); // Use success for loaded
+                            }
+
+                            // Navigation button state is now handled by updateProgress based on index/total
+                            // enableScriptNavigation(true, data.event_index, data.total_events); // Removed - handled by updateProgress
+                            break;
+
+                        case "presenter_generic_update": // Handles script display updates (e.g., after navigation)
+                            // Only update main display if not in a special sequence mode
+                            if (!isInRoastMode) {
+                                currentLineDisplay.textContent = data.current_line || ""; // Use current_line from server
+                                currentPromptDisplay.textContent = data.current_prompt || "-"; // Use current_prompt from server
+                            }
+                             // Always update index and total events
+                            currentEventIndexDisplay.textContent = data.event_index !== undefined && data.event_index > -1 ? data.event_index + 1 : "-";
+                            totalEventsDisplay.textContent = data.total_events !== undefined ? data.total_events : "-";
+                            updateProgress(data.event_index, data.total_events);
+                             // Navigation button state is now handled by updateProgress
+                            // enableScriptNavigation(true, data.event_index, data.total_events); // Removed - handled by updateProgress
+                            break;
+
+
+                        case "audience_display": // Audience updates donm't affect presenter controls
+                             // This is mainly for the separate audience display page
+                             console.log("Presenter: Received audience display update, ignoring on presenter page:", data);
+                             break;
+
+                        case "end_of_script": // Server might send this explicitly, or it's implied by index reaching total-1
+                             // The presenter_generic_update case should handle the last event and disable 'next'
+                             // If server sends this, it's likely just an info message after the last event.
+                             setStatus(data.message || "脚本已播放完毕。", "info");
+                             // updateProgress and enableScriptNavigation already handle disabling next button
+                            break;
+
+                        case "roast_sequence_ready": // Message type: sequence is fetched, but not started sending yet
+                            enterRoastMode('anti_fan');
+                             // Update status to indicate readiness
+                             roastStatusDisplay.innerHTML = `<strong>怼人模式 (目标: ${escapeHTML(data.target_name || 'N/A')})</strong><br>已获取 ${data.total_roasts} 条怼人语录。<br><em>请点击 '发送弹幕并看下一提示' 开始序列。</em>`;
+                             roastStatusDisplay.style.display = 'block';
+                             
+                             // Clear main display areas for roast mode instructions/preview
+                             currentLineDisplay.textContent = "点击下方按钮发送第一条怼人弹幕并查看提示。"; // Instruction
+                             currentPromptDisplay.textContent = "-"; // Clear prompt
+                             
+                             advanceRoastBtn.style.display = 'inline-block'; // Show the advance button
+                             advanceRoastBtn.disabled = false; // Enable the advance button
+                             advanceRoastBtn.textContent = `发送弹幕并看下一提示 (1/${data.total_roasts})`; // Update button text to indicate start
+
+                             setStatus(`怼人模式就绪，目标: ${data.target_name}`, "warning");
+                            break;
+
+                        case "presenter_roast_update": // Handles displaying *next* prompt after clicking advance
+                            // This message indicates the PREVIOUS danmaku was sent (by the server),
+                            // and provides the prompt for the CURRENT index.
+                            enterRoastMode('anti_fan');
+                            
+                            // Update main display with the part the presenter should say
+                            currentLineDisplay.textContent = data.presenter_line || ""; 
+                            
+                            // Update prompt/status area with count and raw template for reference
+                            // Display raw template in prompt area for verification/debugging
+                            roastStatusDisplay.innerHTML = `<strong>怼人模式 (目标: ${escapeHTML(data.target_name || 'N/A')})</strong><br>提示 #${data.current_roast_num} / ${data.total_roasts}<br><em>语录: ${escapeHTML(data.raw_template || '')}</em>`; 
+                            roastStatusDisplay.style.display = 'block'; // Ensure status area is visible
+                            currentPromptDisplay.textContent = "👆 请看上面的提示 👆"; // Indicate where to look
+
+                            advanceRoastBtn.disabled = false; // Enable button to proceed
+                            // Update button text to show progress
+                            advanceRoastBtn.textContent = `发送弹幕并看下一提示 (${data.current_roast_num}/${data.total_roasts})`;
+                            
+                            // Status update might be handled by info/success/error below, or stay as warning
+
+
+                            break;
+
+                        case "roast_sequence_finished":
+                            // Server indicates the roast sequence is complete
+                            setStatus(data.message || "怼人环节已结束。", "success"); // Success state for finish
+                            roastStatusDisplay.innerHTML = `<em>${escapeHTML(data.message || "序列完成。")}</em>`; // Escape message HTML
+                            exitRoastMode(true); // Exit mode visually and notify server to reset state
+
+                            break;
+
+                         case "presenter_danmaku_sent_confirm":
+                             // Confirmation that a manually sent danmaku was broadcast to audience
+                             console.log("Presenter: Danmaku sent confirmation:", data.message);
+                             // Show a temporary confirmation message - setStatus handles this
+                             setStatus(`弹幕已发送`, "success"); 
+
+                            break;
+
+                        case "pong":
+                            // Received pong from server - confirms server is alive and got our connection activity
+                            // The server's heartbeat manager tracks pong responses for timeouts.
+                            // We donm't need to do anything specific client-side unless implementing a client-side timeout based on pong.
+                            // console.log("Presenter: Received pong."); // Too noisy for production
+                            break;
+
+                        case "error":
+                            setStatus(`错误: ${data.message}`, "status");
+                            console.error("Presenter: Server Error:", data);
+                            // If error context is roast_mode and we are in it, exit it gracefully
+                            if (data.context === "roast_mode" && isInRoastMode) {
+                                 roastStatusDisplay.innerHTML = `<em>错误: ${escapeHTML(data.message)}</em>`; // Display error message in roast status
+                                 exitRoastMode(true); // Exit mode visually and notify server
+                            }
+                            // If error context is related to auto_send, re-enable buttons
+                            if (data.context && data.context.startsWith("auto_send")) {
+                                 reEnableAutoSendRelated = true; // Signal to re-enable after handling
+                            }
+
+                            break;
+
+                        case "info":
+                            setStatus(`信息: ${data.message}`, "info");
+                             console.log("Presenter: Server Info:", data);
+                             // If this info message is related to auto-send start/progress, no re-enable yet.
+                            break;
+                        
+                        case "success": // Server can send generic success messages
+                             setStatus(`成功: ${data.message}`, "success");
+                             console.log("Presenter: Server Success:", data);
+                             // If success context is auto_send_finished, re-enable buttons
+                             if (data.context === "auto_send_finished") {
+                                 reEnableAutoSendRelated = true; // Signal to re-enable after handling
+                             }
+                            break;
+
+                         case "re_enable_auto_send_buttons": // Explicit message from server to re-enable auto-send related buttons
+                             reEnableAutoSendRelated = true; // Signal to re-enable after handling
+                             break;
+                         
+                         // No explicit re_enable message needed for manual fetch buttons
+                         // They are re-enabled in the fetchAndDisplayData .finally block
+
+
+                        default:
+                            console.warn("Presenter: Received unknown message type from server:", data.type, data);
+                            // setStatus(`收到未知消息类型: ${data.type}`, "warning"); // Maybe too noisy
+                    }
+
+                     // Check the flag and re-enable buttons if needed after handling the message
+                     if(reEnableAutoSendRelated) {
+                         // Re-enable all controls that were disabled by starting auto-send
+                         enableAllControls(); // Restore default state
+                         // Ensure we donm't re-enter roast mode accidentally if coming from a roast task error
+                         if (isInRoastMode) {
+                             exitRoastMode(false); // Exit visually
+                         }
+                     }
+                     // Manual fetch buttons and related inputs are re-enabled in fetchAndDisplayData's .finally
+
+                } catch (e) {
+                    console.error("Presenter: Error parsing or processing WebSocket message:", e, event.data);
+                    setStatus("处理服务器消息时出错。", "status");
+                    // On any client-side processing error, try to re-enable all controls
+                    enableAllControls();
+                    if (isInRoastMode) {
+                         exitRoastMode(false); // Exit visually
+                    }
+                }
+            };
+
+            websocket.onclose = (event) => {
+                console.log("Presenter: Disconnected from WebSocket.", event.code, event.reason);
+                setStatus("已断开连接，正在尝试自动重连...", "status");
+                disableAllControls(); // Disable ALL controls on disconnect
+                // Attempt to reconnect after a delay, only if not already scheduled
+                if (!reconnectTimer) {
+                    reconnectTimer = setTimeout(connect, reconnectDelay); 
+                     console.log(`Presenter: Attempting to reconnect in ${reconnectDelay / 1000} seconds...`);
+                }
+            };
+
+            websocket.onerror = (error) => {
+                console.error("Presenter: WebSocket Error:", error);
+                // The 'error' event is often followed by the 'close' event.
+                // The 'close' handler is responsible for displaying status and attempting reconnection.
+                // setStatus("WebSocket连接错误。", "status"); // This might be redundant if close follows immediately
+            };
+        }
+
+        function disableAllControls() {
+            // Disable all buttons and inputs
+             const allButtons = document.querySelectorAll('button');
+             allButtons.forEach(button => { button.disabled = true; });
+
+             const allInputs = document.querySelectorAll('input[type="text"], select'); // Also disable select
+             allInputs.forEach(input => { input.disabled = true; });
+
+            // Ensure advanceRoastBtn is hidden when disabled
+             advanceRoastBtn.style.display = 'none';
+
+
+            enableScriptNavigation(false); // Explicitly disable script nav
+
+            danmakuOutputArea.textContent = '等待连接...';
+            danmakuOutputArea.classList.remove('copyable'); 
+
+             // Clear roast mode specific UI when connecting
+             roastStatusDisplay.textContent = ''; // Clear previous roast status
+             roastStatusDisplay.style.display = 'block'; // Ensure it is visible for messages (will be cleared below)
+
+
+             // Clear display related to script/state
+             scriptNameDisplay.textContent = "未加载";
+             progressDisplay.textContent = "N/A";
+             currentLineDisplay.textContent = "等待连接...";
+             currentPromptDisplay.textContent = "-";
+             currentEventIndexDisplay.textContent = "-";
+             totalEventsDisplay.textContent = "-";
+             
+             streamerSearchResultsDiv.style.display = 'none'; // Hide search results dropdown
+
+        }
+
+        function enableAllControls() {
+             // Enable all controls to their default state (enabled) after successful connection/registration
+             // Note: Individual logic below will then re-disable them based on mode (e.g., Roast Mode) or operations (e.g., Fetching)
+
+             const allButtons = document.querySelectorAll('button');
+             allButtons.forEach(button => { 
+                 // Special case: advanceRoastBtn is hidden by default, only shown in roast mode
+                 if (button.id !== 'advanceRoastBtn') {
+                      button.disabled = false; 
+                 }
+             });
+
+             const allInputs = document.querySelectorAll('input[type="text"], select');
+             allInputs.forEach(input => { input.disabled = false; });
+
+             // Script select and browse up buttons enabled/disabled by script_options_update message
+             scriptSelect.disabled = false;
+             // scriptBrowseUpBtn display/hide handled by script_options_update
+             loadSelectedScriptBtn.disabled = true; // Load button is enabled by select change event
+
+             // Script navigation buttons enabled/disabled by script state updates (presenter_generic_update)
+             // enableScriptNavigation(false); // Should be enabled/disabled by state updates, not here
+
+            danmakuOutputArea.textContent = '请先搜索并选择主播，然后获取弹幕。'; // Reset prompt
+            danmakuOutputArea.classList.remove('copyable');
+
+            // Roast status should be cleared after enabling all controls
+            roastStatusDisplay.textContent = "";
+            // roastStatusDisplay.style.display = 'none'; // Maybe hide it when not in roast mode? Let's keep it block for messages
+
+             // Ensure roast advance button is hidden in default state
+             advanceRoastBtn.style.display = 'none';
+             // startRoastBtn is enabled by default in enableAllControls
+        }
+
+
+        function enterRoastMode(modeType) { 
+             // Prevent entering if already in roast mode
+            if (isInRoastMode) return;
+
+            isInRoastMode = true;
+            
+            // Disable controls not related to roast mode
+            enableScriptNavigation(false); 
+
+             fetchWelcomeBtn.disabled = true; 
+             fetchRoastBtn.disabled = true; 
+             autoSendDanmakuBtn.disabled = true;
+             fetchReversalBtn.disabled = true; 
+             fetchCaptionsBtn.disabled = true; 
+             streamerSearchInput.disabled = true; // Disable all fetch related inputs
+             streamerSearchInputReversal.disabled = true; 
+             streamerSearchInputCaptions.disabled = true;
+
+             startRoastBtn.disabled = true; // Disable start button once sequence begins
+             roastTargetNameInput.disabled = true; // Disable roast input once sequence begins
+
+
+             streamerSearchResultsDiv.style.display = 'none'; // Hide search results if open
+
+
+            // Hide start button, show advance button
+            startRoastBtn.style.display = 'none';
+            // advanceRoastBtn display/enabled state handled by server messages (roast_sequence_ready, presenter_roast_update)
+
+             roastStatusDisplay.style.display = 'block'; // Ensure status area is visible
+
+             // Clear main line/prompt displays when entering roast mode
+             currentLineDisplay.textContent = ""; 
+             currentPromptDisplay.textContent = "";
+
+        }
+
+
+        function exitRoastMode(notifyServer = true) {
+            if (!isInRoastMode) return; 
+            isInRoastMode = false; 
+
+            // Restore ALL controls to default state (enabled)
+            enableAllControls(); 
+
+            // Restore main script navigation based on current state received from server
+            // Sending a refresh request ensures UI sync:
+            sendMessage({ action: "get_current_event_for_presenter" });
+
+
+            // Clear roast status area unless it contains an error message
+            if (!roastStatusDisplay.textContent.startsWith("错误")) {
+                 // Temporarily show "已退出" message
+                 roastStatusDisplay.textContent = "已退出怼人模式。";
+                 // Clear after a delay, ensuring it's still the same message
+                 setTimeout(() => {
+                     if (roastStatusDisplay.textContent === "已退出怼人模式。") {
+                          roastStatusDisplay.textContent = ""; // Clear the status
+                          // Decide if you want to hide the block entirely or keep it visible
+                          // roastStatusDisplay.style.display = 'none'; // Or hide it
+                     }
+                 }, 3000);
+
+             }
+            // Otherwise, if it was an error message, leave it visible until a new status arrives.
+
+
+            // Main display will be restored by the presenter_generic_update message
+
+            // Notify server if needed
+             if (notifyServer && websocket && websocket.readyState === WebSocket.OPEN) {
+                  sendMessage({ action: "exit_roast_mode" });
+             } else if (notifyServer) {
+                 console.warn("Presenter: Cannot notify server of exit roast mode, WebSocket not open.");
+             }
+        }
+
+
+         // Helper to prevent XSS if danmaku contains HTML-like text
+         function escapeHTML(str) {
+             if (typeof str !== 'string') return str; // Handle non-string input
+             const div = document.createElement('div');
+             div.appendChild(document.createTextNode(str));
+             return div.innerHTML;
+         }
+
+
+        // --- Event Listeners ---
+
+        // Script Browsing/Loading
+        scriptSelect.addEventListener('change', () => {
+            const selectedOption = scriptSelect.options[scriptSelect.selectedIndex];
+            // Enable load button ONLY if a file type is selected and WebSocket is open
+            if (selectedOption && selectedOption.dataset.type === 'script_file' && websocket && websocket.readyState === WebSocket.OPEN) {
+                loadSelectedScriptBtn.disabled = false;
+            } else {
+                loadSelectedScriptBtn.disabled = true;
+            }
+        });
+
+        scriptSelect.addEventListener('dblclick', () => {
+            const selectedOption = scriptSelect.options[scriptSelect.selectedIndex];
+            // Check if WebSocket is open before sending
+             if (websocket && websocket.readyState === WebSocket.OPEN && selectedOption && selectedOption.value) {
+                if (selectedOption.dataset.type === 'browse_dir') {
+                    sendMessage({ action: "browse_script_path", path: selectedOption.value });
+                } else if (selectedOption.dataset.type === 'script_file') {
+                    sendMessage({ action: "load_script", filename: selectedOption.value });
+                }
+             } else if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                 setStatus("WebSocket未连接，无法执行操作。", "status");
+             }
+             // Do nothing if no valid option selected or double-clicked something else
+        });
+
+        scriptBrowseUpBtn.addEventListener('click', () => {
+            if (currentBrowsePathContext && websocket && websocket.readyState === WebSocket.OPEN) {
+                // Calculate parent path relative to BASE_DIR (using Path object logic server-side)
+                // Client sends the current relative path, server computes the parent
+                sendMessage({ action: "browse_script_path", path: currentBrowsePathContext + "/.." }); // Append /.. for server to resolve
+            } else if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                 setStatus("WebSocket未连接，无法执行操作。", "status");
+            }
+        });
+
+        loadSelectedScriptBtn.addEventListener('click', () => {
+            const selectedOption = scriptSelect.options[scriptSelect.selectedIndex];
+            // Check if a script file is selected and WebSocket is open
+            if (selectedOption && selectedOption.dataset.type === 'script_file' && websocket && websocket.readyState === WebSocket.OPEN) {
+                sendMessage({ action: "load_script", filename: selectedOption.value });
+            } else if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                 setStatus("WebSocket未连接，无法加载脚本。", "status");
+            }
+        });
+
+        // Script Navigation
+        prevEventBtn.addEventListener('click', () => {
+             // Check if button is enabled (handled by enableScriptNavigation) and WebSocket is open
+             if (!prevEventBtn.disabled && websocket && websocket.readyState === WebSocket.OPEN) {
+                 sendMessage({ action: "prev_event" });
+             } else if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                 setStatus("WebSocket未连接，无法执行操作。", "status");
+             }
+        });
+        nextEventBtn.addEventListener('click', () => {
+            // Check if button is enabled (handled by enableScriptNavigation) and WebSocket is open
+             if (!nextEventBtn.disabled && websocket && websocket.readyState !== WebSocket.OPEN) {
+                 sendMessage({ action: "next_event" });
+             } else if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                 setStatus("WebSocket未连接，无法执行操作。", "status");
+             }
+        });
+
+        // Roast Mode Controls (Anti-Fan)
+        startRoastBtn.addEventListener('click', () => {
+        const targetName = roastTargetNameInput.value.trim();
+        if (!targetName) {
+            roastStatusDisplay.textContent = "请输入黑粉昵称。";
+            return;
+        }
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            console.log(`Presenter: startRoastBtn clicked for target "${targetName}", starting roast mode...`);
+            const targetName = roastTargetNameInput.value.trim();
+            if (!targetName) {
+                roastStatusDisplay.textContent = "请输入黑粉昵称。";
+                return;
+            }
+             // Check if WebSocket is open (Required for this feature's sequence control)
+             if (websocket && websocket.readyState === WebSocket.OPEN) {
+                 // Disable controls not related to roast mode or sequence
+                 enableScriptNavigation(false); 
+                 fetchWelcomeBtn.disabled = true; 
+                 fetchRoastBtn.disabled = true; 
+                 autoSendDanmakuBtn.disabled = true; 
+                 fetchReversalBtn.disabled = true; 
+                 fetchCaptionsBtn.disabled = true; 
+                 streamerSearchInput.disabled = true; 
+                 streamerSearchInputReversal.disabled = true; 
+                 streamerSearchInputCaptions.disabled = true;
+                 
+                 // Disable roast start button and input while fetching sequence
+                 startRoastBtn.disabled = true;
+                 roastTargetNameInput.disabled = true;
+
+
+                 roastStatusDisplay.textContent = `正在为 "${targetName}" 获取怼人语录...`;
+                 roastStatusDisplay.style.display = 'block'; // Ensure status area is visible
+                 
+                 // Send action to get the sequence. Server will respond with roast_sequence_ready or error.
+                 sendMessage({ action: "get_roast_sequence", target_name: targetName });
+
+                 // The advance button will be enabled when roast_sequence_ready is received.
+
+             } else {
+                 setStatus("WebSocket未连接，无法开始怼人模式。", "status");
+                 roastStatusDisplay.textContent = "WebSocket未连接，怼人模式不可用。";
+                  roastStatusDisplay.style.display = 'block'; // Ensure status area is visible
+             }
+        });
+
+        advanceRoastBtn.addEventListener('click', () => {
+            // Check if in roast mode, button is enabled, and WebSocket is open
+            if (!isInRoastMode || advanceRoastBtn.disabled || !websocket || websocket.readyState !== WebSocket.OPEN) {
+                if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                    setStatus("WebSocket未连接，无法执行操作。", "status");
+                }
+                 return;
+            }
+
+            // In the anti-fan roast mode, clicking 'advance' means trigger the server to:
+            // 1. Send the danmaku for the *current* prompt (at the new index) to audience.
+            // 2. Prepare the *next* prompt's presenter line and update the UI.
+            
+            // Before sending, ensure the button is disabled to prevent rapid clicks
+            advanceRoastBtn.disabled = true; 
+
+            // Send action to server to advance the sequence.
+            // The server will handle sending the danmaku and preparing the next prompt.
+            sendMessage({ action: "advance_roast" }); 
+            
+            // The button will be re-enabled when the NEXT prompt arrives via WebSocket ("presenter_roast_update")
+            // or when the sequence finishes ("roast_sequence_finished").
+
+        });
+
+        // Global Keyboard Shortcuts
+        document.addEventListener('keydown', (event) => {
+            // Prevent interference with input fields
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+                return;
+            }
+
+            // Only process keyboard shortcuts if WebSocket is open and registered
+             if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                 // Optionally give feedback
+                 // console.warn("Presenter: WebSocket not connected, keyboard shortcuts disabled.");
+                 return;
+             }
+
+
+            if (isInRoastMode) {
+                // In roast mode, Space/PgDn triggers advanceRoastBtn
+                if (event.key === ' ' || event.key === 'PageDown') {
+                    event.preventDefault(); // Prevent scrolling
+                    if (!advanceRoastBtn.disabled && advanceRoastBtn.style.display !== 'none') {
+                         // Check if button is visible and enabled
+                        advanceRoastBtn.click();
+                    } else {
+                         console.log("Presenter: Roast advance button not active or disabled.");
+                    }
+                } else if (event.key === 'PageUp') { // Maybe PgUp should exit roast mode too?
+                     // Decide if PgUp should exit or do nothing in roast mode
+                     console.log("Presenter: PgUp pressed in Roast Mode. No action defined.");
+                }
+                else if (event.key === 'Escape') {
+                    event.preventDefault(); // Prevent default Escape behavior if needed
+                    // Exit any active sequence mode
+                    if (isInRoastMode) {
+                        exitRoastMode(true); // Allow server notification to reset state
+                    }
+                }
+            } else {
+                // Normal script navigation
+                if (event.key === ' ' || event.key === 'PageDown') {
+                    event.preventDefault(); // Prevent scrolling
+                    // nextEventBtn state is managed by updateProgress/enableScriptNavigation
+                    if (!nextEventBtn.disabled) {
+                        nextEventBtn.click();
+                    }
+                } else if (event.key === 'PageUp') {
+                    event.preventDefault(); // Prevent scrolling
+                     // prevEventBtn state is managed by updateProgress/enableScriptNavigation
+                    if (!prevEventBtn.disabled) {
+                        prevEventBtn.click();
+                    }
+                }
+            }
+        });
+
+
+        // --- New Feature: Streamer Danmaku Search and Fetch (Uses HTTP API and WebSocket) ---
+
+        // --- Search Suggestion Logic (Triggered by any search input, suggestions under the first one) ---
+
+        // Add focus event listeners to track which search input is active
+        streamerSearchInput.addEventListener('focus', (event) => { lastFocusedSearchInput = event.target; });
+        streamerSearchInputReversal.addEventListener('focus', (event) => { lastFocusedSearchInput = event.target; });
+        streamerSearchInputCaptions.addEventListener('focus', (event) => { lastFocusedSearchInput = event.target; });
+
+
+        // Add input event listeners to ALL search inputs to trigger debounce
+        streamerSearchInput.addEventListener('input', (event) => { triggerSearchDebounce(event.target); });
+        streamerSearchInputReversal.addEventListener('input', (event) => { triggerSearchDebounce(event.target); });
+         streamerSearchInputCaptions.addEventListener('input', (event) => { triggerSearchDebounce(event.target); });
+
+
+        function triggerSearchDebounce(inputElement) {
+            clearTimeout(searchDebounceTimer);
+            const searchTerm = inputElement.value.trim();
+            // Only trigger search if there's a term to search for and WebSocket is open
+            // Adding WebSocket check here because API search depends on DB connection which is checked on WS registration
+            if (searchTerm.length > 0 && websocket && websocket.readyState === WebSocket.OPEN) {
+                searchDebounceTimer = setTimeout(() => {
+                    fetchStreamerSuggestions(searchTerm);
+                }, 300); // 300ms debounce delay
+            } else {
+                // Hide results immediately if input is cleared or WebSocket is not open
+                streamerSearchResultsDiv.style.display = 'none';
+                streamerSearchResultsDiv.innerHTML = '';
+                 if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                      console.warn("Presenter: WebSocket not connected. Search suggestions disabled.");
+                 }
+            }
+        }
+
+
+        function fetchStreamerSuggestions(term) {
+             // This uses HTTP fetch API to the Flask server. It should work
+             // as long as the Flask API server is running on FLASK_PORT,
+             // and the HTML page is accessed via http://localhost:5000 or http://server_ip:5000
+             // Using apiUrl correctly builds the URL.
+
+            console.log(`Presenter: Fetching streamer suggestions for term: "${term}" from ${apiUrl}/search_streamers`); // Log the URL
+            fetch(`${apiUrl}/search_streamers?term=${encodeURIComponent(term)}`)
+                .then(response => {
+                     console.log("Presenter: Search streamers API response status:", response.status);
+                     if (!response.ok) {
+                         // Handle non-200 responses like 400, 500 from server
+                         // The .json() parsing below will handle the structured error if provided
+                         // If server returns HTML (like 500 error page), response.json() will throw SyntaxError
+                         // We catch this SyntaxError in the next .catch block
+                         return response.json().then(data => {
+                            // If server returned JSON error, throw a specific Error
+                            throw new Error(`HTTP error! status: ${response.status}, message: ${data.error || '未知错误'}`);
+                         });
+                     }
+                    return response.json(); // This is where SyntaxError for non-JSON happens if server returns HTML
+                })
+                .then(data => {
+                    console.log("Presenter: Search streamers API response data:", data);
+                    streamerSearchResultsDiv.innerHTML = ''; // Clear previous results
+                    // Assume data is an array of strings if no error in previous step
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        data.forEach(name => {
+                            const div = document.createElement('div');
+                            div.textContent = name;
+                            div.addEventListener('click', () => {
+                                // When a suggestion is clicked, put the value into the LAST FOCUSED input field
+                                if (lastFocusedSearchInput) {
+                                     lastFocusedSearchInput.value = name;
+                                     // After selecting, blur the input to dismiss mobile keyboards and clear focus state visually
+                                     lastFocusedSearchInput.blur(); 
+                                } else {
+                                     // Fallback to the first input if focus tracking failed (unlikely with focus listeners)
+                                     streamerSearchInput.value = name;
+                                     streamerSearchInput.blur(); 
+                                }
+
+                                // Hide and clear results
+                                streamerSearchResultsDiv.style.display = 'none';
+                                streamerSearchResultsDiv.innerHTML = ''; 
+                            });
+                            streamerSearchResultsDiv.appendChild(div);
+                        });
+                        streamerSearchResultsDiv.style.display = 'block'; // Show dropdown
+                    } else {
+                        // No results found or empty array
+                        const noResultDiv = document.createElement('div');
+                        noResultDiv.textContent = "未找到匹配的主播名";
+                        noResultDiv.style.color = '#6c757d';
+                        noResultDiv.style.padding = '8px'; // Add padding to look like an option
+                        streamerSearchResultsDiv.appendChild(noResultDiv);
+                        streamerSearchResultsDiv.style.display = 'block'; // Show "no result" message
+                    }
+                })
+                .catch(error => {
+                    console.error('Presenter: Error fetching streamer suggestions:', error);
+                     // Display a network error message near the search box
+                    streamerSearchResultsDiv.innerHTML = ''; // Clear previous results
+                    const errorDiv = document.createElement('div');
+                    // Check if the error is the JSON parsing error
+                    if (error instanceof SyntaxError && error.message.includes("Unexpected token '<'")) {
+                         errorDiv.textContent = "搜索失败: 服务器内部错误 (非JSON响应)。请检查服务器终端日志。";
+                    } else {
+                         errorDiv.textContent = `搜索失败: ${error.message}`; // Display specific error message
+                    }
+                    errorDiv.style.color = 'red';
+                     errorDiv.style.padding = '8px';
+                    streamerSearchResultsDiv.appendChild(errorDiv);
+                    streamerSearchResultsDiv.style.display = 'block';
+                     // Optionally clear the error message after a delay
+                     setTimeout(() => { streamerSearchResultsDiv.style.display = 'none'; }, 5000); // Hide after 5 seconds
+                });
+        }
+
+        // Hide search results when clicking outside the input or results area
+        document.addEventListener('click', function(event) {
+            // Check if the click was inside the main search container (where the dropdown appears)
+            const searchContainerDiv = streamerSearchInput.closest('.search-container'); // Get the parent container of the first input
+
+            // Also check if the click was on any of the search input elements themselves
+            const isClickOnInput = event.target === streamerSearchInput || event.target === streamerSearchInputReversal || event.target === streamerSearchInputCaptions;
+             // Also check if the click was inside the search results dropdown itself
+            const isClickInsideResults = streamerSearchResultsDiv.contains(event.target);
+
+
+            // Hide if clicked outside the main search container AND not directly on any search input AND not inside the results dropdown
+            if (searchContainerDiv && !searchContainerDiv.contains(event.target) && !isClickOnInput && !isClickInsideResults) {
+                 streamerSearchResultsDiv.style.display = 'none';
+             }
+             // If the click was inside the main search container (including the dropdown), the suggestion click listener handles it.
+             // If the click was on one of the other search inputs, the focus listener updates lastFocusedSearchInput, and the input listener triggers a *new* search.
+        });
+
+
+        // Fetch and display data lists from API (for manual copy) - MODIFIED to handle different input elements
+        function fetchAndDisplayData(type, inputElement) { // Accept inputElement as argument
+            const streamerName = inputElement.value.trim(); // Get value from the specific input element
+            if (!streamerName) {
+                danmakuOutputArea.innerHTML = '请输入并选择一个主播名/主题名。'; // Use innerHTML for consistency
+                danmakuOutputArea.classList.remove('copyable');
+                return;
+            }
+            
+            console.log(`Presenter: Attempting to fetch ${type} data for streamer/topic: "${streamerName}"`); 
+            danmakuOutputArea.innerHTML = '正在加载数据...'; // Use innerHTML to clear previous formatted content
+            danmakuOutputArea.classList.remove('copyable');
+
+            let endpoint = '';
+            let context = ''; // For logging/status
+            let displayTitle = ''; // Title for status and messages
+
+            // Determine the API endpoint and display title based on the requested type
+            if (type === 'welcome' || type === 'roast') {
+                 endpoint = `${apiUrl}/streamer_danmaku?name=${encodeURIComponent(streamerName)}&type=${encodeURIComponent(type)}`;
+                 context = 'fetch_danmaku';
+                 displayTitle = type === 'welcome' ? '欢迎弹幕' : '吐槽弹幕';
+            } else if (type === 'reversal') {
+                 endpoint = `${apiUrl}/streamer_reversal_copy?name=${encodeURIComponent(streamerName)}`;
+                 context = 'fetch_reversal';
+                 displayTitle = '反转语录';
+            } else if (type === 'captions') { // Now handles Social_Topics
+                 endpoint = `${apiUrl}/streamer_social_topics?name=${encodeURIComponent(streamerName)}`; // Use Social_Topics API
+                 context = 'fetch_captions'; 
+                 displayTitle = '主题/段子'; 
+            } else {
+                 console.error(`Presenter: Invalid fetch type: ${type}`);
+                 setStatus("内部错误: 无效的获取类型。", "status");
+                 danmakuOutputArea.innerHTML = "发生内部错误。";
+                 return;
+            }
+
+            // Disable ALL manual fetch buttons and auto-send/roast buttons during ANY manual fetch
+            // This simplifies button state management during fetching.
+             fetchWelcomeBtn.disabled = true;
+             fetchRoastBtn.disabled = true;
+             fetchReversalBtn.disabled = true;
+             fetchCaptionsBtn.disabled = true;
+             autoSendDanmakuBtn.disabled = true; 
+             startRoastBtn.disabled = true; 
+             roastTargetNameInput.disabled = true; // Disable roast input too
+
+
+            fetch(endpoint)
+                .then(response => {
+                     console.log(`Presenter: ${context} API response status:`, response.status);
+                     if (!response.ok) {
+                         // Handle non-200 responses
+                         // If server returns HTML (like 500 error page), response.json() will throw SyntaxError
+                         // We catch this SyntaxError in the next .catch block
+                          return response.json().then(data => {
+                             // If server returned JSON error, throw a specific Error
+                            throw new Error(`HTTP error! status: ${response.status}, message: ${data.error || '未知错误'}`);
+                          });
+                     }
+                    return response.json(); // This is where SyntaxError for non-JSON happens
+                })
+                .then(data => {
+                    console.log(`Presenter: ${context} API response data:`, data);
+                    
+                    danmakuOutputArea.innerHTML = ''; // Clear previous results
+                    
+                    if (data && Array.isArray(data) && data.length > 0) {
+                         let htmlContent = '';
+                         data.forEach((item, index) => {
+                             // Handle different data structures based on type
+                             if (type === 'welcome' || type === 'roast' || type === 'captions') { // Welcome/Mock/Social_Topics return list of strings
+                                 // Expected: list of strings
+                                  // Add leading number and escape HTML
+                                  // Wrap simple text in a div for easier copy target later
+                                  htmlContent += `<div>${index + 1}. ${escapeHTML(item)}</div>`; 
+                             } else if (type === 'reversal') { // Expected: list of dicts {"danmaku_part": "...", "read_part": "..."}
+                                 if (typeof item === 'object' && item !== null) {
+                                     const danmaku = item.danmaku_part || '';
+                                     const read = item.read_part || '';
+                                     htmlContent += `<div>${index + 1}.</div>`; // Add number outside the parts div for Reversal
+                                     // Wrap danmaku and prompt parts in their own divs with specific classes
+                                     htmlContent += `<div class="danmaku-item-part"><strong>弹幕:</strong> ${escapeHTML(danmaku)}</div>`;
+                                     htmlContent += `<div class="danmaku-item-part"><strong>提示:</strong> ${escapeHTML(read)}</div>`;
+                                 } else {
+                                      console.warn(`Presenter: Received non-object item in ${type} data:`, item);
+                                      htmlContent += `<div>${index + 1}. [数据格式错误]</div>`; // Show error for the item
+                                 }
+                             }
+                             htmlContent += `\n`; // Add newline after each item/group of parts for pre-wrap spacing
+                         });
+                         
+                         danmakuOutputArea.innerHTML = htmlContent; // Set the formatted HTML
+                         danmakuOutputArea.classList.add('copyable'); // Make the container copyable
+                         setStatus(`已获取 ${data.length} 条${displayTitle}。点击文本复制内容。`, "info"); // Updated status message
+                    } else {
+                        // No results found or empty array from server
+                        danmakuOutputArea.innerHTML = `未找到针对 "${streamerName}" 的${displayTitle}。`; // Use innerHTML
+                         danmakuOutputArea.classList.remove('copyable');
+                         setStatus(`未找到数据: ${streamerName} 的${displayTitle}。`, "warning");
+                    }
+                })
+                .catch(error => {
+                    console.error(`Presenter: Error fetching ${type} data:`, error);
+                    // Check if the error is the JSON parsing error
+                    if (error instanceof SyntaxError && error.message.includes("Unexpected token '<'")) {
+                         danmakuOutputArea.innerHTML = `获取${displayTitle}失败: 服务器内部错误 (非JSON响应)。请检查服务器终端日志。`; // Use innerHTML
+                    } else {
+                         danmakuOutputArea.innerHTML = `获取${displayTitle}失败: ${escapeHTML(error.message)}`; // Display specific error message, escape potential HTML in message
+                    }
+                     danmakuOutputArea.classList.remove('copyable');
+                     setStatus(`获取${displayTitle}失败: ${error.message}`, "status");
+                })
+                .finally(() => {
+                     // Re-enable manual fetch buttons and roast start button after ANY manual fetch process finishes (success or error)
+                     // Auto-send button state is handled by server messages if starting auto-send disabled it.
+                     fetchWelcomeBtn.disabled = false;
+                     fetchRoastBtn.disabled = false;
+                     fetchReversalBtn.disabled = false;
+                     fetchCaptionsBtn.disabled = false;
+                     startRoastBtn.disabled = false; // Re-enable roast start button
+                     roastTargetNameInput.disabled = false; // Re-enable roast input
+
+                     // autoSendDanmakuBtn state is ONLY managed by server messages (auto_send_danmaku starts it, re_enable_auto_send_buttons re-enables it)
+                     // But we should also re-enable it here if it wasn't disabled by starting auto-send
+                      if (!autoSendDanmakuBtn.disabled) { // Check if it was already disabled by starting auto-send
+                          autoSendDanmakuBtn.disabled = false; // Re-enable it if it wasn't
+                      }
+                      // Re-enable search inputs as well
+                      streamerSearchInput.disabled = false;
+                      streamerSearchInputReversal.disabled = false; 
+                      streamerSearchInputCaptions.disabled = false;
+
+                });
+        }
+
+        // Add click listeners to the displayed danmaku items for easy copying
+        // Use event delegation on the container #danmaku_output_area
+         danmakuOutputArea.addEventListener('click', function(event) {
+            const clickedElement = event.target;
+             // Check if the container is marked as copyable
+            if (danmakuOutputArea.classList.contains('copyable')) {
+                let textToCopy = '';
+                let elementToHighlight = null; // Keep track of the element to highlight
+
+                // If clicked directly on .danmaku-item-part, get its text content and mark it for highlight
+                if (clickedElement.classList.contains('danmaku-item-part')) {
+                    const labelSpan = clickedElement.querySelector('strong');
+                    if (labelSpan) {
+                         // Get text content after the label
+                         textToCopy = clickedElement.textContent.substring(labelSpan.textContent.length).trim();
+                    } else {
+                         textToCopy = clickedElement.textContent.trim(); // Fallback if strong tag not found
+                    }
+                    elementToHighlight = clickedElement; // Highlight the part div
+
+                } else if (clickedElement.parentElement && clickedElement.parentElement.classList.contains('danmaku-item-part')) {
+                     // If clicked on a child element inside .danmaku-item-part (e.g. strong tag)
+                     const danmakuPartElement = clickedElement.parentElement;
+                     const labelSpan = danmakuPartElement.querySelector('strong');
+                     if (labelSpan) {
+                          // Get text content after the label
+                          textToCopy = danmakuPartElement.textContent.substring(labelSpan.textContent.length).trim();
+                     } else {
+                          textToCopy = danmakuPartElement.textContent.trim();
+                     }
+                     elementToHighlight = danmakuPartElement; // Highlight the parent part div
+
+
+                } else if (danmakuOutputArea.contains(clickedElement) && clickedElement !== danmakuOutputArea) {
+                    // If clicked on text directly within danmaku_output_area (likely for Welcome/Mock or Social_Topics strings)
+                    // Need to find the specific div containing the text that was clicked
+                    let targetTextDiv = clickedElement;
+                     // Traverse up to find the containing div or stop at the main container
+                     while (targetTextDiv && targetTextDiv.tagName !== 'DIV' && targetTextDiv !== danmakuOutputArea) {
+                         targetTextDiv = targetTextDiv.parentElement;
+                     }
+
+                    if (targetTextDiv && targetTextDiv !== danmakuOutputArea) { // Ensure we found a div and it's not the main container
+                         // Check if it is a simple text line (like Welcome/Mock/Social_Topics)
+                         if (!targetTextDiv.classList.contains('danmaku-item-part')) {
+                             const lineText = targetTextDiv.textContent;
+                             // Use regex to find the text content after the leading number and dot
+                             const match = lineText.match(/^\d+\.\s*(.*)/);
+                             textToCopy = match ? match[1].trim() : lineText.trim(); // Copy text after number. or the whole line
+                             elementToHighlight = targetTextDiv; // Highlight the div element
+                         }
+                         // If it *is* a danmaku-item-part, the first two checks handle it.
+                         
+                    } else if (clickedElement === danmakuOutputArea) {
+                         // Clicked on the container itself, do nothing for copy
+                         textToCopy = ''; // No text to copy from container background
+                    } else {
+                         // Fallback: Get text content of the clicked element if it is not the container
+                         // This case might happen if clicking directly on a text node inside a div without specific class
+                         textToCopy = clickedElement.textContent ? clickedElement.textContent.trim() : '';
+                         // No easy way to highlight. elementToHighlight remains null or could be set to danmakuOutputArea for broad feedback.
+                    }
+
+
+                }
+
+
+                if (textToCopy) {
+                     // Prevent copying the placeholder or initial text
+                     if (textToCopy === '请先搜索并选择主播，然后获取弹幕。' || textToCopy === '正在加载数据...' || textToCopy === '连接已断开。') { // Updated placeholder text check
+                          console.log("Presenter: Skipping copy of placeholder/status text.");
+                          return; // Do not copy placeholder text
+                     }
+
+                     navigator.clipboard.writeText(textToCopy).then(() => {
+                         console.log('Presenter: Copied:', textToCopy);
+                         // Show temporary visual feedback on the element itself if we have one to highlight
+                        if (elementToHighlight && elementToHighlight.style) {
+                            const originalBackground = elementToHighlight.style.backgroundColor;
+                            const originalColor = elementToHighlight.style.color;
+                             // Also save original border/box-shadow if you added styles there
+                             const originalBorder = elementToHighlight.style.border;
+                             const originalBoxShadow = elementToHighlight.style.boxShadow;
+
+                            elementToHighlight.style.backgroundColor = '#d4edda'; // Light green background
+                            elementToHighlight.style.color = '#155724'; // Darker green text
+
+
+                            setTimeout(() => {
+                                elementToHighlight.style.backgroundColor = originalBackground; // Restore background
+                                elementToHighlight.style.color = originalColor; // Restore color
+                                // Restore border/box-shadow
+                                elementToHighlight.style.border = originalBorder;
+                                elementToHighlight.style.boxShadow = originalBoxShadow;
+
+                            }, 500); // Change back after 0.5 seconds
+                        }
+
+
+                         setStatus("内容已复制到剪贴板！", "success"); // Updated status message
+                         // Clear status message after a few seconds if it is still the copy success message
+                         const copySuccessMessage = "内容已复制到剪贴板！"; // Updated message to match
+                         setTimeout(() => {
+                             if (statusMessageDisplay.textContent === copySuccessMessage) {
+                                 // Restore connection status if no other message arrived
+                                  if (websocket && websocket.readyState === WebSocket.OPEN) {
+                                       setStatus("已连接到提词服务器。", "success");
+                                  } else if (websocket && websocket.readyState === WebSocket.CONNECTING) {
+                                       setStatus("正在尝试连接...", "info");
+                                  } else {
+                                       setStatus("已断开连接，正在尝试自动重连...", "status");
+                                  }
+                             }
+                         }, 3000); // Clear after 3 seconds
+
+                     }).catch(err => {
+                         console.error('Presenter: Failed to copy text: ', err);
+                         setStatus("复制失败。", "status"); // Updated status message
+                     });
+                 } else {
+                      console.log("Presenter: Clicked element has no text to copy or extract.");
+                      // Optionally provide user feedback that there was nothing to copy
+                      // setStatus("没有可复制的内容。", "warning"); // Uncomment for feedback
+                 }
+             }
+        });
+
+        // --- Add listeners for the fetch buttons, passing the correct input element ---
+        fetchWelcomeBtn.addEventListener('click', () => {
+            fetchAndDisplayData('welcome', streamerSearchInput); // Pass streamerSearchInput
+        });
+
+        fetchRoastBtn.addEventListener('click', () => {
+            fetchAndDisplayData('roast', streamerSearchInput); // Pass streamerSearchInput
+        });
+
+        // NEW: Add listeners for the new fetch buttons, passing their specific input elements
+        fetchReversalBtn.addEventListener('click', () => {
+            fetchAndDisplayData('reversal', streamerSearchInputReversal); // Pass streamerSearchInputReversal
+        });
+         fetchCaptionsBtn.addEventListener('click', () => {
+            fetchAndDisplayData('captions', streamerSearchInputCaptions); // Pass streamerSearchInputCaptions
+        });
+
+
+        // New button for auto send functionality
+        // This button ONLY sends Welcome/Mock danmaku, so it should still use the FIRST input value
+        autoSendDanmakuBtn.addEventListener('click', () => {
+             const streamerName = streamerSearchInput.value.trim(); // Use the main search input value for auto-send
+             if (!streamerName) {
+                 setStatus('请输入并选择一个主播名才能自动发送弹幕。', 'warning');
+                 return;
+             }
+
+             // Check if WebSocket is open
+             if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                 setStatus("WebSocket未连接，无法自动发送弹幕。", "status");
+                 return;
+             }
+             
+             // Disable buttons during sending to prevent interference
+             autoSendDanmakuBtn.disabled = true;
+             // Disable manual fetch and roast start buttons as auto send runs
+             fetchWelcomeBtn.disabled = true; 
+             fetchRoastBtn.disabled = true;
+             fetchReversalBtn.disabled = true; // Disable new fetch buttons
+             fetchCaptionsBtn.disabled = true; // Disable new fetch buttons
+             startRoastBtn.disabled = true; 
+             roastTargetNameInput.disabled = true; 
+             
+             // Disable individual search inputs
+             streamerSearchInput.disabled = true; // Also disable the input fields themselves
+             streamerSearchInputReversal.disabled = true; 
+             streamerSearchInputCaptions.disabled = true;
+
+
+             setStatus(`正在准备自动发送 ${streamerName} 的欢迎/吐槽弹幕...`, "info"); // Specify which types are sent
+
+
+             // Send the action to the server via WebSocket
+             sendMessage({ action: "auto_send_danmaku", streamer_name: streamerName });
+
+             // Server will handle fetching and sending.
+             // Server will send back status/info/success/error messages during the process.
+             // The buttons and inputs will be re-enabled when the task finishes (server sends success/error with context or re_enable_auto_send_buttons message).
+
+        });
+
+
+        // --- Initial Connection ---
+        // Wait for the DOM to be fully loaded before attempting to connect
+        document.addEventListener('DOMContentLoaded', (event) => {
+            console.log('Presenter: DOM fully loaded. Attempting WebSocket connection.');
+            connect();
+        });
+
+
+    </script>
+</body>
+</html>

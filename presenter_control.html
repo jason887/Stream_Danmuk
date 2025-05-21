@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主播提词器控制端</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 800px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; margin-top: 0.8em; margin-bottom: 0.4em; }
+        .control-panel, .script-info, .current-line-display, .status-messages, .navigation-controls, .roast-controls, .danmaku-section, .reversal-section, .captions-section { /* Added new sections */
+            margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;
+        }
+        #currentLine { font-size: 1.8em; color: #007bff; margin-bottom: 10px; min-height: 50px; white-space: pre-wrap; }
+        #currentPrompt { font-size: 1.2em; color: #28a745; font-style: italic; min-height: 30px; white-space: pre-wrap; }
+        button { padding: 10px 15px; margin: 5px 5px 5px 0; border: none; border-radius: 4px; cursor: pointer; background-color: #007bff; color: white; font-size: 1em; }
+        button:hover:not(:disabled) { background-color: #0056b3; } /* Add not(:disabled) */
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .status { color: #dc3545; } .info { color: #17a2b8; } .warning { color: #ffc107; } .success { color: #28a445; } /* Slightly adjusted success color */
+        .event-index { font-size: 0.9em; color: #6c757d; text-align: right; }
+        
+        #script-browser { display: flex; flex-direction: column; gap: 10px; }
+        #script-path-breadcrumb { font-weight: bold; color: #555; margin-bottom: 5px; }
+        #script-select { width: 100%; min-height: 100px; border: 1px solid #ccc; border-radius: 4px; padding: 5px; box-sizing: border-box; }
+        .script-browse-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .script-browse-controls button { margin-top: 0; margin-bottom: 0; }
+    
+        .roast-controls div, .danmaku-section div, .reversal-section div, .captions-section div { /* Added new sections divs */
+             margin-bottom: 10px; display: flex; flex-wrap: wrap; align-items: center;
+        }
+        .roast-controls label, .danmaku-section label, .reversal-section label, .captions-section label { /* Added new sections labels */
+             margin-right: 10px; 
+        }
+        .roast-controls input[type="text"], 
+        .danmaku-section input[type="text"], 
+        .reversal-section input[type="text"], /* Added new sections inputs */
+        .captions-section input[type="text"] { /* Added new sections inputs */
+             padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; min-width: 150px; 
+        }
+        #roastStatus { font-style: italic; color: #555; margin-top: 10px; white-space: pre-wrap; min-height: 20px;}
+        
+        /* Shared Danmaku Output Area */
+        .danmaku-section h4, .reversal-section h4, .captions-section h4 { /* Added new sections h4 */
+             margin-top: 15px; margin-bottom: 5px; 
+        }
+        #danmaku_output_area { 
+            margin-top: 10px; 
+            white-space: pre-wrap; 
+            background-color: #e9ecef; 
+            padding: 10px; 
+            border-radius: 4px; 
+            min-height: 50px; 
+            color: #333; 
+            max-height: 300px; 
+            overflow-y: auto; 
+            border: 1px solid #ccc;
+            cursor: text; /* Default cursor */
+        }
+         #danmaku_output_area.copyable {
+             cursor: copy;
+         }
+
+        /* Adjust search-container to only wrap the first input and its results */
+        .danmaku-section .search-container { 
+            position: relative; 
+            flex-grow: 1; 
+            min-width: 150px;
+        }
+         /* Simple input container for others */
+         .input-container {
+             flex-grow: 1;
+             min-width: 100px; /* Adjusted min-width slightly */
+             /* Add margin/padding if needed to match search-container visual spacing */
+         }
+
+
+        .search-results {
+            position: absolute;
+            top: 100%; /* Position below the input */
+            left: 0;
+            right: 0;
+            z-index: 10; /* Ensure it is above other content */
+            border: 1px solid #ccc;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            max-height: 150px; /* Limit height */
+            overflow-y: auto; /* Add scroll if needed */
+            border-radius: 4px;
+            margin-top: 2px; /* Small gap between input and dropdown */
+        }
+        .search-results div {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 0; /* Override flex margin */
+            display: block; /* Make divs block level for full width clicking */
+        }
+        .search-results div:last-child {
+            border-bottom: none;
+        }
+        .search-results div:hover {
+            background-color: #f0f0f0;
+        }
+        /* Specific input styling - keep flex-grow */
+        .danmaku-section input[type="text"], .reversal-section input[type="text"], .captions-section input[type="text"] { flex-grow: 1;} 
+        /* Specific button styling - keep margins */
+        .danmaku-section div > button, .reversal-section div > button, .captions-section div > button { 
+             margin-top: 5px; margin-bottom: 5px;
+        }
+
+        #connectionStatusCircle {
+             display: inline-block;
+             width: 12px;
+             height: 12px;
+             border-radius: 50%;
+             margin-left: 10px;
+             vertical-align: middle; /* Align with text */
+             background-color: gray; /* Default color */
+        }
+         #autoSendDanmakuBtn {
+            background-color: #28a745; /* Green color */
+            color: white;
+         }
+          #autoSendDanmakuBtn:hover:not(:disabled) {
+             background-color: #218838; /* Darker green on hover */
+          }
+
+         /* Style for multi-part items in the output area */
+         .danmaku-item-part {
+             margin-bottom: 10px; /* Space between parts of one item */
+             padding: 8px;
+             border: 1px dashed #ccc; /* Visual separator */
+             border-radius: 4px;
+             background-color: #f1f1f1;
+             color: #333; /* Ensure text is visible against light background */
+         }
+         .danmaku-item-part strong {
+             color: #000; /* Make labels stand out */
+         }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>主播提词器控制端</h1>
+
+        <div class="status-messages">
+            <h2>状态/消息 <span id="connectionStatusCircle" class="status-indicator"></span></h2>
+            <div id="status-message" class="status status-text">未连接到服务器</div>
+        </div>
+
+        <div class="control-panel">
+            <h2>脚本控制</h2>
+            <div id="script-browser">
+                <div id="script-path-breadcrumb">选择脚本来源</div>
+                <div class="script-browse-controls">
+                    <button id="script-browse-up-btn" style="display: none;">返回上一级</button>
+                </div>
+                <select id="script-select" size="8">
+                    <option value="">-- 等待连接 --</option>
+                </select>
+                <button id="load-selected-script-btn" disabled>加载选中脚本</button>
+            </div>
+        </div>
+
+        <div class="script-info">
+            <h3>当前脚本: <span id="scriptName">未加载</span></h3>
+            <h3>进度: <span id="progress">N/A</span></h3>
+        </div>
+
+        <div class="current-line-display">
+            <h2>当前台词</h2>
+            <div id="currentLine">等待加载脚本...</div>
+            <h2>提示</h2>
+            <div id="currentPrompt">-</div>
+            <div class="event-index">事件: <span id="currentEventIndex">-</span> / <span id="totalEvents">-</span></div>
+        </div>
+        
+        <div class="navigation-controls">
+            <h2>导航</h2>
+            <button id="prevEventBtn" disabled>上一条 (PgUp)</button>
+            <button id="nextEventBtn" disabled>下一条 (Space/PgDn)</button>
+        </div>
+
+        <div class="roast-controls">
+            <h2>怼黑粉模式 (随机语录)</h2>
+            <div>
+                <label for="roastTargetName">黑粉昵称:</label>
+                <input type="text" id="roastTargetName" placeholder="输入黑粉昵称">
+                <button id="startRoastBtn">开始怼人序列 (3条)</button>
+            </div>
+            <button id="advanceRoastBtn" style="display: none; background-color: #ffc107; color: black;">发送弹幕并看下一提示 (空格)</button>
+            <div id="roastStatus" style="white-space: pre-wrap; min-height: 20px;"></div>
+            <p><small>注: 该模式会随机选取语录，将语录中**最后一个全角逗号（，）前的部分**（包含 {} 参数）替换后作为弹幕发送给观众，**最后一个全角逗号（，）后的部分**将显示在“当前台词”区域作为您的提示。请确保数据库中的语录使用全角逗号分隔。</small></p>
+        </div>
+
+        <!-- 新增欢迎/感谢大哥按钮区域 -->
+        <div class="danmaku-section">
+            <h2>大哥弹幕</h2>
+            <div>
+                <input type="text" id="bossNicknameInput" placeholder="输入大哥/大姐昵称..." style="margin-right:10px;flex:1;">
+                <input type="text" id="giftNameInput" placeholder="输入礼物名称..." style="margin-right:10px;flex:1;">
+            </div>
+            <div>
+                <button id="sendWelcomeBossBtn">欢迎大哥</button>
+                <button id="sendThanksBossBtn">感谢大哥</button>
+            </div>
+            <p><small>点击按钮后，将自动分两组发送30条弹幕，每组滑动22秒。</small></p>
+        </div>
+
+        <!-- 获取主播预设弹幕区域 (Welcome/Mock Danmaku) -->
+        <div class="danmaku-section">
+            <h2>欢迎弹幕</h2>
+            <div>
+                <label for="streamer_search_input">主播名:</label>
+                <div class="search-container">
+                    <input type="text" id="streamer_search_input" placeholder="输入主播名进行搜索...">
+                    <div id="streamer_search_results" class="search-results" style="display: none;">
+                        <!-- Search results will be populated here -->
+                    </div>
+                </div>
+            </div>
+            <div> <!-- Separate div for buttons -->
+                 <button id="fetch_welcome_danmaku_btn">获取欢迎弹幕列表 (10条)</button>
+                 <button id="fetch_roast_danmaku_btn">获取吐槽弹幕列表 (10条)</button>
+                 <!-- New button for auto send (Applies to Welcome/Mock fetched above) -->
+                 <button id="autoSendDanmakuBtn">自动发送欢迎/吐槽弹幕</button>
+            </div>
+            
+            <h4>弹幕结果 (点击复制):</h4>
+            <div id="danmaku_output_area">请先搜索并选择主播，然后获取弹幕。</div>
+            <p><small>注: 从上方列表获取弹幕后，您可以手动复制弹幕内容并发送到直播间或使用其他发送弹幕的工具，或者点击“自动发送”按钮通过服务器发送给观众页面。**这个区域也用于显示下方模块的获取结果。**</small></p>
+        </div>
+        <!-- 区域结束 -->
+
+        <!-- NEW: Reversal_Copy Section -->
+        <div class="reversal-section">
+             <h2>加载主播反转 (Reversal_Copy)</h2>
+             <div>
+                 <label for="streamer_search_input_reversal">主播名:</label>
+                 <div class="search-container">
+                     <input type="text" id="streamer_search_input_reversal" placeholder="输入主播名进行搜索...">
+                     <div id="reversal_search_results" class="search-results" style="display: none;">
+                         <!-- 搜索结果下拉 -->
+                     </div>
+                 </div>
+                 <button id="fetch_reversal_btn">获取反转语录 (10条)</button>
+             </div>
+             <p><small>注: 获取的结果会显示在上方的“弹幕结果”区域。</small></p>
+        </div>
+        <!-- NEW Section End -->
+
+        <!-- NEW: Social_Topics Section -->
+        <div class="captions-section">
+             <h2>加载主题/段子 (Social_Topics)</h2>
+             <div>
+                 <label for="streamer_search_input_captions">主题名:</label>
+                 <div class="search-container">
+                     <input type="text" id="streamer_search_input_captions" placeholder="输入主题名进行搜索...">
+                     <div id="captions_search_results" class="search-results" style="display: none;">
+                         <!-- 搜索结果下拉 -->
+                     </div>
+                 </div>
+                 <button id="fetch_captions_btn">获取主题/段子数据 (10条)</button>
+             </div>
+              <p><small>注: 获取的结果会显示在上方的“弹幕结果”区域。</small></p>
+        </div>
+        <!-- NEW Section End -->
+
+
+    </div> <!-- end .container -->
+
+    <script src="/static/presenter_core.js" defer></script> <!-- Core first --> 
+    <script src="/static/presenter_dom_vars.js" defer></script> <!-- Declare DOM variables --> 
+    <script src="/static/presenter_ui_utils.js" defer></script> <!-- Utility functions (depend on dom_vars, core) --> 
+    <script src="/static/presenter_script_handlers.js" defer></script> <!-- Script handlers (depend on dom_vars, core, ui_utils) --> 
+    <script src="/static/presenter_roast_handlers.js" defer></script> <!-- Roast handlers (depend on dom_vars, core, ui_utils) --> 
+    <script src="/static/presenter_danmaku_handlers.js" defer></script> <!-- Danmaku handlers (depend on dom_vars, core, ui_utils) --> 
+    <script src="/static/presenter_init.js" defer></script> <!-- Main initializer (depends on all others) -->
+
+    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+      <span class="status-indicator disconnected" style="width: 12px; height: 12px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 8px;"></span>
+      <span class="status-text" style="font-size: 14px; color: #888;">未连接</span>
+    </div>
+</body>
+</html>
