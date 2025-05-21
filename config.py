@@ -1,4 +1,7 @@
 # config.py
+from dotenv import load_dotenv
+import os
+from pathlib import Path
 
 import logging
 from pathlib import Path
@@ -8,7 +11,9 @@ FLASK_PORT = 5000
 WEBSOCKET_PORT = 8765
 
 # Determine the base directory of the script (assuming config.py is in the same dir as server.py)
+
 BASE_DIR = Path(__file__).parent
+load_dotenv(dotenv_path=BASE_DIR / "MongoDB_url.env")
 # Static files directory (for HTML, CSS, JS)
 STATIC_FOLDER = BASE_DIR / "static"
 # Scripts directory
@@ -16,7 +21,7 @@ SCRIPTS_DIR = BASE_DIR / "scripts"
 
 # --- Database Configuration (Moved from old db_manager.py/db_config.py) ---
 # Replace with your MongoDB connection string if different
-MONGO_URI = "mongodb://jason:jason123@47.119.142.129:27017/"
+MONGO_URI = os.getenv("mongodb_url")
 DB_NAME = "trae_data"
 
 # --- WebSocket Core Configuration (Moved from ws_core.py if they were there) ---
