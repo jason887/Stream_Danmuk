@@ -16,8 +16,8 @@ try:
 except ImportError:
     logging.critical("database.db_config: Could not import configuration from config.py. Ensure config.py is accessible.")
     # Provide dummy values to prevent immediate errors, though DB will likely fail
-    MONGO_URI = "mongodb://localhost:27017/"
-    DB_NAME = "default_db"
+    MONGO_URI = "mongodb://jason:jason123@47.119.142.129:27017/"
+    DB_NAME = "my_database"
 
 
 # Collection names (Defined here, specific to the database structure)

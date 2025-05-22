@@ -1,311 +1,294 @@
 // static/presenter_script_handlers.js
-// Handles WebSocket messages and UI interactions related to script browsing and navigation.
-// Assumes global DOM variables (window.*) are assigned in presenter_init.js.
+// Handles WebSocket messages and UI interactions related to general scripts
+// and the "反转主播名 (剧本模式)" (Reversed Anchor Name - Script Mode) feature.
+
+// Assumes global DOM variables (window.*) are declared in presenter_dom_vars.js and assigned in presenter_init.js.
 // Assumes sendMessage and updateStatus (window.*) are available from presenter_core.js.
-// Assumes UI utility functions (window.*) like updateLoadButtonState, updateProgress are available.
+// Assumes displayFetchedList (window.*) is available from presenter_ui_utils.js.
 
-// --- Handler Functions (Called by Event Listeners or presenter_init.js's dispatcher) ---
+// --- Reversed Anchor Name (Script Mode) Handlers ---
 
-// Handles message updating script options (directories and files).
-// data: { current_path, breadcrumb: [{name, path}], options: [{name, path, type: 'browse_dir' | 'script_file'}] }
-function handleScriptOptionsMessage(data) {
-    console.debug("Script_Handlers: Received script_options_update:", data);
-    const options = data.options; // List of {name, path, type}
-    const currentPath = data.current_path; // Relative path string
-    const breadcrumb = data.breadcrumb; // List of {name, path}
-
-    if (window.scriptSelect) { // Access global var
-        window.scriptSelect.innerHTML = ''; // Clear existing options
-        if (options && options.length > 0) {
-            options.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.path; // Use relative path as value
-                option.textContent = item.name; // Display name (includes / for dirs)
-                option.dataset.is_dir = item.type === 'browse_dir'; // Store directory status
-                window.scriptSelect.appendChild(option);
-            });
-             // Update load button state based on new options using the utility function
-             if (typeof window.updateLoadButtonState === 'function') window.updateLoadButtonState();
-             else console.warn("Script_Handlers: updateLoadButtonState function not available.");
-
-             window.scriptSelect.disabled = false; // Ensure select is enabled (unless disabled by modal state handled elsewhere)
-        } else {
-            const option = document.createElement('option');
-            option.value = "";
-            option.textContent = "-- 无可用脚本或目录 --";
-            window.scriptSelect.appendChild(option);
-             if (window.loadSelectedScriptBtn) window.loadSelectedScriptBtn.disabled = true;
-             window.scriptSelect.disabled = true;
-        }
-        console.debug("Script_Handlers: Script options updated in select.");
-    } else {
-         console.warn("Script_Handlers: scriptSelect element not found for script_options_update.");
-    }
-
-    // Update breadcrumb display
-    if (window.scriptPathBreadcrumb) { // Access global var
-         // Build breadcrumb HTML with links
-        window.scriptPathBreadcrumb.innerHTML = breadcrumb.map((item, index) => {
-            if (index === breadcrumb.length - 1) {
-                // Last item is current directory, not a link
-                return item.name;
-            } else {
-                // Other items are links to navigate. Use data-path to store path.
-                // Call a globally exposed handler function on click
-                return `<a href="#" data-path="${item.path}" onclick="window.handleBreadcrumbClick(event);">${item.name}</a>`;
-            }
-        }).join(' > ');
-         console.debug("Script_Handlers: Breadcrumb display updated.");
-    } else {
-         console.warn("Script_Handlers: scriptPathBreadcrumb element not found for script_options_update.");
-    }
-
-
-    // Show/hide browse up button (based on currentPath not being root ".")
-    if (window.scriptBrowseUpBtn) { // Access global var
-        if (currentPath && currentPath !== '.' && currentPath !== '') {
-            window.scriptBrowseUpBtn.style.display = 'inline-block';
-        } else {
-            window.scriptBrowseUpBtn.style.display = 'none';
-        }
-        // browse up button disabled state is managed by reEnableScriptBrowse
-        console.debug("Script_Handlers: Browse up button visibility updated.");
-    } else {
-         console.warn("Script_Handlers: scriptBrowseUpBtn element not found for script_options_update.");
-    }
-
-     if (typeof window.updateStatus === 'function') window.updateStatus("脚本列表更新。", "info");
-}
-
-// Handles double click on an item in the script select list.
-function handleScriptSelectDblClick() {
-    if (!window.scriptSelect) return; // Access global var
-    const selectedOption = window.scriptSelect.options[window.scriptSelect.selectedIndex];
-    if (!selectedOption) return;
-
-    const selectedPath = selectedOption.value;
-    const isDir = selectedOption.dataset.is_dir === 'true'; // Check data attribute
-
-     // Assumes sendMessage is globally available via window.sendMessage
+// Called when the "加载反转剧本列表" button is clicked.
+function handleLoadReversalScriptsRequest() {
     if (typeof window.sendMessage === 'function') {
-        if (isDir) {
-            console.log("Script_Handlers: Double clicked directory, sending 'browse_scripts' action:", selectedPath);
-            window.sendMessage({ action: "browse_scripts", path: selectedPath });
-            if (typeof window.updateStatus === 'function') window.updateStatus(`浏览目录 "${selectedPath}"...`, "info");
+        if (typeof window.updateStatus === 'function') window.updateStatus("正在加载反转剧本列表...", "info");
+        if (typeof window.clearOutputArea === 'function') window.clearOutputArea(); // Clear previous results
+        // Clear the specific presenter display area for this feature
+        if (window.presenterScriptLineDisplay) {
+            window.presenterScriptLineDisplay.textContent = "选择反转剧本后，您的提示将显示在此处。";
         } else {
-            console.log("Script_Handlers: Double clicked file, sending 'load_script' action:", selectedPath);
-            window.sendMessage({ action: "load_script", filename: selectedPath });
-            if (typeof window.updateStatus === 'function') window.updateStatus(`加载脚本 "${selectedPath}"...`, "info");
+            console.warn("Script_Handlers: presenterScriptLineDisplay element not found to clear.");
         }
+
+        console.log("Script_Handlers: Sending action: fetch_reversal_scripts_request");
+        window.sendMessage({ action: "fetch_reversal_scripts_request" }); 
+        // Server will respond with "reversal_scripts_list"
     } else {
-         console.error("Script_Handlers: sendMessage function not available.");
-         if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化。", "error");
+        console.error("Script_Handlers: sendMessage function not available.");
+        if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化。", "error");
     }
 }
 
- // Handles click on the "Load Selected Script" button.
+// Called when the server sends the list of reversal scripts.
+function handleReversalScriptsListMessage(data) {
+    console.log("Script_Handlers: Received reversal_scripts_list:", data);
+    const scriptsList = Array.isArray(data.scripts_list) ? data.scripts_list : []; 
+
+    if (typeof window.displayFetchedList === 'function') {
+        window.displayFetchedList(
+            scriptsList, 
+            `选择一个反转剧本 (共 ${scriptsList.length} 条):`, 
+            (item, index) => { // itemFormatter
+                // Display the full script initially, or just a part of it as a title
+                // For now, display full script, it will be split on click.
+                return `(${index + 1}) ${item}`; 
+            },
+            (scriptText, originalItem) => { // onItemClick callback
+                // scriptText here is the full script string from the list.
+                handleReversalScriptSelected(scriptText);
+            }
+        );
+    } else {
+        console.warn("Script_Handlers: displayFetchedList function not available.");
+        if (typeof window.updateStatus === 'function') window.updateStatus("UI功能(displayFetchedList)未初始化。", "error");
+    }
+}
+
+// Called when a presenter clicks on a fetched reversal script from the "弹幕结果" area.
+function handleReversalScriptSelected(scriptText) {
+    if (!scriptText || typeof scriptText !== 'string') {
+        console.warn("Script_Handlers: Invalid script text for selection.");
+        if (typeof window.updateStatus === 'function') window.updateStatus("无效的剧本内容。", "warning");
+        if (window.presenterScriptLineDisplay) { // Clear display on error too
+            window.presenterScriptLineDisplay.textContent = "选择反转剧本后，您的提示将显示在此处。";
+        }
+        return;
+    }
+
+    // Calculate the midpoint
+    const midpoint = Math.floor(scriptText.length / 2);
+    const audiencePart = scriptText.substring(0, midpoint);
+    const presenterPart = scriptText.substring(midpoint);
+
+    // Display presenterPart in the dedicated display area
+    if (window.presenterScriptLineDisplay) {
+        window.presenterScriptLineDisplay.textContent = presenterPart;
+        console.log("Script_Handlers: Displayed presenter part:", presenterPart);
+    } else {
+        console.warn("Script_Handlers: presenterScriptLineDisplay element not found.");
+    }
+
+    // Send audiencePart to the server
+    if (typeof window.sendMessage === 'function') {
+        if (!audiencePart.trim()) {
+             if (typeof window.updateStatus === 'function') window.updateStatus("注意：弹幕部分为空，未发送。", "warning");
+             console.warn("Script_Handlers: Audience part is empty, not sending.");
+             return; // Do not send if audience part is empty
+        }
+        const messageData = {
+            action: "send_reversal_audience_part",
+            audience_part: audiencePart,
+            full_script: scriptText // Optionally send the full script for context or logging
+        };
+        console.log("Script_Handlers: Sending action: send_reversal_audience_part", messageData);
+        window.sendMessage(messageData);
+        if (typeof window.updateStatus === 'function') window.updateStatus(`已发送反转剧本弹幕: "${audiencePart}"`, "success");
+    } else {
+        console.error("Script_Handlers: sendMessage function not available.");
+        if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化，无法发送。", "error");
+    }
+}
+
+// --- Standard Script Handling (Existing from original file if any) ---
+// This is for the main script loading/navigation, distinct from reversal scripts.
+// Assuming these were in the original presenter_script_handlers.js or need to be added.
+
+// Handles selection/deselection in the script list.
+function handleScriptSelectDblClick() {
+    if (window.scriptSelect && window.scriptSelect.value) {
+        if (window.loadSelectedScriptBtn && !window.loadSelectedScriptBtn.disabled) {
+            handleLoadSelectedScript();
+        }
+    }
+}
+
+// Handles click on "Load Selected Script" button.
 function handleLoadSelectedScript() {
-    if (!window.loadSelectedScriptBtn || !window.scriptSelect) return; // Access global vars
-
-    if (!window.loadSelectedScriptBtn.disabled) { // Check if UI element is enabled
+    if (window.scriptSelect && window.scriptSelect.value) {
         const selectedOption = window.scriptSelect.options[window.scriptSelect.selectedIndex];
-         if (!selectedOption || selectedOption.value === "") return; // Should be disabled if no selection, but double check
-
-        const selectedPath = selectedOption.value;
-        const isDir = selectedOption.dataset.is_dir === 'true';
-
-        if (!isDir) { // Only load if it's a file
-             // Assumes sendMessage is globally available via window.sendMessage
+        if (selectedOption.dataset.is_dir === 'true') {
+            // It's a directory, browse into it
             if (typeof window.sendMessage === 'function') {
-                 console.log("Script_Handlers: loadSelectedScriptBtn clicked, sending 'load_script' action:", selectedPath);
-                 window.sendMessage({ action: "load_script", filename: selectedPath });
-                 if (typeof window.updateStatus === 'function') window.updateStatus(`正在加载脚本 "${selectedPath}"...`, "info");
-            } else {
-                 console.error("Script_Handlers: sendMessage function not available.");
-                 if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化。", "error");
+                window.sendMessage({ action: "browse_scripts", path: selectedOption.value });
             }
         } else {
-             console.log("Script_Handlers: Cannot load a directory via load button.");
-             if (typeof window.updateStatus === 'function') window.updateStatus("请选择一个脚本文件加载，双击文件夹进入。", "warning");
+            // It's a file, load it
+            if (typeof window.sendMessage === 'function') {
+                window.sendMessage({ action: "load_script", script_path: selectedOption.value });
+                if(typeof window.updateStatus === 'function') window.updateStatus(`正在加载脚本: ${selectedOption.text}...`, "info");
+            }
         }
     } else {
-         console.log("Script_Handlers: loadSelectedScriptBtn is disabled.");
-         // Status message might already be set indicating why it's disabled (e.g. no selection, roast mode)
+        if(typeof window.updateStatus === 'function') window.updateStatus("请先选择一个脚本或目录。", "warning");
     }
 }
 
- // Handles click on the "Browse Up" button.
+// Handles "Up" button for script browsing.
 function handleBrowseUp() {
-    if (!window.scriptBrowseUpBtn) return; // Access global var
-
-    if (!window.scriptBrowseUpBtn.disabled) { // Check if UI element is enabled
-         // Assumes sendMessage is globally available via window.sendMessage
-        if (typeof window.sendMessage === 'function') {
-            console.log("Script_Handlers: scriptBrowseUpBtn clicked, sending 'browse_scripts' action with '..'");
-            window.sendMessage({ action: "browse_scripts", path: ".." }); // Send ".." to go up one level
-            if (typeof window.updateStatus === 'function') window.updateStatus("返回上一级目录...", "info");
-        } else {
-             console.error("Script_Handlers: sendMessage function not available.");
-             if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化。", "error");
-        }
-    } else {
-         console.log("Script_Handlers: scriptBrowseUpBtn is disabled.");
+    if (typeof window.sendMessage === 'function') {
+        window.sendMessage({ action: "browse_scripts", path: ".." });
     }
 }
 
- // Handles click on a breadcrumb link (called by inline onclick in HTML).
- // event: The click event object.
-function handleBreadcrumbClick(event) {
-     event.preventDefault(); // Prevent default link behavior
-     const path = event.target.dataset.path; // Get path from data attribute
-
-     if (path !== undefined) {
-         // Assumes sendMessage is globally available via window.sendMessage
-        if (typeof window.sendMessage === 'function') {
-             console.log("Script_Handlers: Breadcrumb clicked, sending 'browse_scripts' action:", path);
-             window.sendMessage({ action: "browse_scripts", path: path });
-             if (typeof window.updateStatus === 'function') window.updateStatus(`浏览目录 "${path}"...`, "info");
-        } else {
-             console.error("Script_Handlers: sendMessage function not available.");
-             if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化。", "error");
-        }
-     }
+// Handles clicks on breadcrumb path segments for script browsing.
+function handleBreadcrumbClick(path) {
+    if (typeof window.sendMessage === 'function') {
+        window.sendMessage({ action: "browse_scripts", path: path });
+    }
 }
 
 
-// Handles message updating the current script event display.
-// data: { script_filename, total_events, event_index, current_line, current_prompt, is_roast_mode, roast_target, roast_templates_count }
-// Assumes global DOM variables (window.*) are assigned.
-// Assumes updateProgress is globally available via window.updateProgress.
+// Handles messages about script options from the server.
+function handleScriptOptionsMessage(data) {
+    if (!window.scriptSelect || !window.scriptPathBreadcrumb || !window.scriptBrowseUpBtn) {
+        console.warn("Script_Handlers: Script browsing DOM elements not found.");
+        return;
+    }
+    window.scriptSelect.innerHTML = ''; // Clear existing options
+
+    // Update breadcrumb
+    window.scriptPathBreadcrumb.innerHTML = ''; // Clear existing breadcrumbs
+    if (data.breadcrumb && data.breadcrumb.length > 0) {
+        data.breadcrumb.forEach((part, index) => {
+            const segment = document.createElement('a');
+            segment.href = '#';
+            segment.textContent = part.name;
+            // Use an IIFE or a different approach if part.path can change before click
+            segment.onclick = (function(path) {
+                return function() { handleBreadcrumbClick(path); return false; };
+            })(part.path);
+            window.scriptPathBreadcrumb.appendChild(segment);
+            if (index < data.breadcrumb.length - 1) {
+                window.scriptPathBreadcrumb.appendChild(document.createTextNode(' / '));
+            }
+        });
+    } else {
+        window.scriptPathBreadcrumb.textContent = "脚本根目录";
+    }
+     // Show/hide "Up" button
+    window.scriptBrowseUpBtn.style.display = data.can_go_up ? 'inline-block' : 'none';
+
+
+    if (data.options && data.options.length > 0) {
+        data.options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.path; // Full path for dirs/files
+            option.textContent = opt.name;
+            option.dataset.is_dir = opt.is_dir.toString(); // Store as string
+            if (opt.is_dir) {
+                option.textContent += '/'; // Indicate directory
+                option.style.color = 'blue';
+            }
+            window.scriptSelect.appendChild(option);
+        });
+    } else {
+        const option = document.createElement('option');
+        option.value = "";
+        option.textContent = "-- 无可用脚本或目录 --";
+        option.disabled = true;
+        window.scriptSelect.appendChild(option);
+    }
+    if (typeof window.updateLoadButtonState === 'function') window.updateLoadButtonState();
+}
+
+
+// Handles messages about the current script event from the server.
 function handleCurrentEventUpdateMessage(data) {
-    console.debug("Script_Handlers: Received current_event_update:", data);
-    // Update script info display
-    if (window.scriptNameSpan) window.scriptNameSpan.textContent = data.script_filename || "未加载";
-    if (window.totalEventsSpan) window.totalEventsSpan.textContent = data.total_events !== undefined && data.total_events >= 0 ? data.total_events : '-';
-    if (window.currentEventIndexSpan) window.currentEventIndexSpan.textContent = data.event_index !== undefined && data.event_index > -1 ? data.event_index + 1 : "-";
-
-    // Update progress display using the helper function
-     if (typeof window.updateProgress === 'function') window.updateProgress(data.event_index, data.total_events);
-     else console.warn("Script_Handlers: updateProgress function not available.");
-
-
-    // Update line/prompt display based on roast mode state
-    if (!data.is_roast_mode) {
-        if (window.currentLineDiv) window.currentLineDiv.textContent = data.current_line || "";
-        if (window.currentPromptDiv) window.currentPromptDiv.textContent = data.current_prompt || "-";
-         // When exiting roast mode, roastStatusDiv is cleared by handleRoastSequenceFinishedMessage
-    } else {
-         // If roast mode IS active, clear script lines and show roast info placeholders
-        if (window.currentLineDiv) window.currentLineDiv.textContent = "进入怼黑粉模式...";
-        if (window.currentPromptDiv) window.currentPromptDiv.textContent = "请按'发送弹幕并看下一提示'按钮"; // Initial prompt for roast
-         // Roast status is primarily updated by handleRoastSequenceReadyMessage and handlePresenterRoastUpdateMessage
-         // Clear script info if in roast mode? Or just line/prompt? Let's keep script info visible.
+    // Ensure all DOM elements are available
+    if (!window.currentLineDiv || !window.currentPromptDiv || !window.scriptNameSpan || 
+        !window.progressSpan || !window.prevEventBtn || !window.nextEventBtn ||
+        !window.currentEventIndexSpan || !window.totalEventsSpan) {
+        console.warn("Script_Handlers: One or more DOM elements for event update not found.");
+        return;
     }
 
+    window.currentLineDiv.textContent = data.current_line || "-";
+    window.currentPromptDiv.textContent = data.presenter_prompt || "-";
+    window.scriptNameSpan.textContent = data.script_name || "未加载";
+    
+    // Update event index display
+    window.currentEventIndexSpan.textContent = data.current_event_index !== undefined && data.current_event_index >= 0 ? data.current_event_index + 1 : '-';
+    window.totalEventsSpan.textContent = data.total_events || '-';
 
-    // Enable/disable navigation buttons based on state and roast mode
-    const scriptLoaded = data.total_events > 0;
-    const atStart = data.event_index <= 0;
-    const atEnd = data.event_index >= data.total_events - 1;
-
-    // Disable if no script, at start/end, OR in roast mode
-    if (window.prevEventBtn) window.prevEventBtn.disabled = !scriptLoaded || atStart || data.is_roast_mode;
-    if (window.nextEventBtn) window.nextEventBtn.disabled = !scriptLoaded || atEnd || data.is_roast_mode;
-
-    // Disable script browsing/loading buttons if roast mode is active
-    // This is also handled by reEnableAutoSendButtons, but setting explicitly here on state update is robust.
-    const disableBrowseControls = data.is_roast_mode;
-    if (window.scriptSelect) window.scriptSelect.disabled = disableBrowseControls;
-    if (window.loadSelectedScriptBtn && window.scriptSelect) { // Re-evaluate load button based on selection and roast state
-         const selectedOption = window.scriptSelect.options[window.scriptSelect.selectedIndex];
-         // Disabled if disableBrowseControls is true, OR if no selection/it's a directory
-        window.loadSelectedScriptBtn.disabled = disableBrowseControls || !selectedOption || selectedOption.value === "" || selectedOption.dataset.is_dir === 'true';
-    } else if (window.loadSelectedScriptBtn) { // Handle case where scriptSelect is missing
-         window.loadSelectedScriptBtn.disabled = disableBrowseControls;
+    // Update progress text using utility function
+    if (typeof window.updateProgress === 'function') {
+        window.updateProgress(data.current_event_index, data.total_events);
+    } else { // Fallback if updateProgress is not available
+        window.progressSpan.textContent = (data.total_events && data.total_events > 0) ?
+            `事件: ${data.current_event_index !== undefined ? data.current_event_index + 1 : '-'}/${data.total_events}` : "N/A";
     }
+    
+    // Enable/disable navigation buttons
+    window.prevEventBtn.disabled = !data.can_go_prev;
+    window.nextEventBtn.disabled = !data.can_go_next;
 
-    if (window.scriptBrowseUpBtn) window.scriptBrowseUpBtn.disabled = disableBrowseControls;
-
-    console.debug("Script_Handlers: Script display and navigation state updated.");
-}
-
-// Handles click on the "Previous Event" button.
-function handlePrevEvent() {
-     if (!window.prevEventBtn) return; // Access global var
-    if (!window.prevEventBtn.disabled) { // Check if UI element is enabled
-         // Assumes sendMessage is globally available via window.sendMessage
-        if (typeof window.sendMessage === 'function') {
-            console.log("Script_Handlers: prevEventBtn clicked, sending 'prev_event' action...");
-            window.sendMessage({ action: "prev_event" });
-        } else {
-             console.error("Script_Handlers: sendMessage function not available.");
-             if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化。", "error");
-        }
-    } else {
-        console.log("Script_Handlers: prevEventBtn is disabled.");
+    // If script is loaded, roast mode should be disabled (handled by reEnableAutoSendButtons)
+    // If no script is loaded (e.g. data.script_name is "未加载" or empty), re-evaluate roast button state.
+    if (typeof window.reEnableAutoSendButtons === 'function') {
+        window.reEnableAutoSendButtons(); 
     }
 }
 
-// Handles click on the "Next Event" button.
-function handleNextEvent() {
-     if (!window.nextEventBtn) return; // Access global var
-    if (!window.nextEventBtn.disabled) { // Check if UI element is enabled
-         // Assumes sendMessage is globally available via window.sendMessage
-        if (typeof window.sendMessage === 'function') {
-            console.log("Script_Handlers: nextEventBtn clicked, sending 'next_event' action...");
-            window.sendMessage({ action: "next_event" });
-        } else {
-             console.error("Script_Handlers: sendMessage function not available.");
-             if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化。", "error");
-        }
-    } else {
-         console.log("Script_Handlers: nextEventBtn is disabled.");
-    }
-}
-
-// Handles keyboard shortcuts for script navigation and roast mode advance.
-// event: The keyboard event object.
-// Assumes global DOM variables are assigned.
-// Assumes handleAdvanceRoastSequence is globally available via window.handleAdvanceRoastSequence.
+// Handles keyboard shortcuts for script navigation.
 function handleKeyboardShortcuts(event) {
-     // Ensure elements exist before checking disabled state
-     const nextBtnEnabled = window.nextEventBtn && !window.nextEventBtn.disabled; // Access global var
-     const advanceBtnVisibleAndEnabled = window.advanceRoastBtn && window.advanceRoastBtn.style.display !== 'none' && !window.advanceRoastBtn.disabled; // Access global var
-     const prevBtnEnabled = window.prevEventBtn && !window.prevEventBtn.disabled; // Access global var
+    // Check if focus is on an input field, if so, don't trigger shortcuts
+    if (document.activeElement && (document.activeElement.tagName.toLowerCase() === 'input' || document.activeElement.tagName.toLowerCase() === 'textarea')) {
+        return;
+    }
 
-
-    if (event.code === 'Space' || event.code === 'PageDown') {
-         // Space or PgDn triggers Next Script Event or Advance Roast
-        if (nextBtnEnabled) {
-            event.preventDefault(); // Prevent default only if we handle the key
-            handleNextEvent(); // Call handler defined in this file
-        } else if (advanceBtnVisibleAndEnabled) {
-            event.preventDefault();
-            // Call handler defined in roast_handlers.js (must be globally available)
-             if (typeof window.handleAdvanceRoastSequence === 'function') window.handleAdvanceRoastSequence();
-             else console.warn("Script_Handlers: handleAdvanceRoastSequence function not available for keyboard shortcut.");
+    // If roast mode is active (advanceRoastBtn is visible), Space advances roast
+    if (window.advanceRoastBtn && window.advanceRoastBtn.style.display !== 'none') {
+        if (event.code === 'Space') {
+            event.preventDefault(); // Prevent scrolling
+            if (!window.advanceRoastBtn.disabled) window.advanceRoastBtn.click();
         }
-    } else if (event.code === 'PageUp') {
-        // PgUp triggers Previous Script Event
-        if (prevBtnEnabled) {
+        // Other keys are not handled by roast mode for now
+    } else { // Standard script navigation
+        if (event.code === 'Space' || event.code === 'PageDown') {
             event.preventDefault();
-            handlePrevEvent(); // Call handler defined in this file
+            if (window.nextEventBtn && !window.nextEventBtn.disabled) window.nextEventBtn.click();
+        } else if (event.code === 'PageUp') {
+            event.preventDefault();
+            if (window.prevEventBtn && !window.prevEventBtn.disabled) window.prevEventBtn.click();
         }
     }
-     // Add other keyboard shortcuts if needed
+}
+
+// Clears presenter-specific script browsing path (called on disconnect by ws_core)
+function clear_presenter_browse_path(websocket_unused) {
+    // This function is called by ws_core.py, but the state is client-side.
+    // We can reset the breadcrumb and script list to initial state.
+    if (window.scriptPathBreadcrumb) window.scriptPathBreadcrumb.textContent = "选择脚本来源";
+    if (window.scriptSelect) {
+        window.scriptSelect.innerHTML = '<option value="">-- 等待连接 --</option>';
+    }
+    if (window.scriptBrowseUpBtn) window.scriptBrowseUpBtn.style.display = 'none';
+    console.log("Script_Handlers: Cleared presenter script browse path display.");
 }
 
 
-// Expose handlers globally via window object so they can be called by event listeners or dispatcher
-window.handleScriptOptionsMessage = handleScriptOptionsMessage; // Called by init.js dispatcher
-window.handleScriptSelectDblClick = handleScriptSelectDblClick; // Called by event listener in init.js
-window.handleLoadSelectedScript = handleLoadSelectedScript; // Called by event listener in init.js
-window.handleBrowseUp = handleBrowseUp; // Called by event listener in init.js
-window.handleBreadcrumbClick = handleBreadcrumbClick; // Called by inline onclick in HTML
-window.handleCurrentEventUpdateMessage = handleCurrentEventUpdateMessage; // Called by init.js dispatcher
-window.handlePrevEvent = handlePrevEvent; // Called by event listener in init.js and keyboard handler
-window.handleNextEvent = handleNextEvent; // Called by event listener in init.js and keyboard handler
-window.handleKeyboardShortcuts = handleKeyboardShortcuts; // Called by event listener in init.js
+// Expose handlers that need to be called from presenter_init.js or other modules
+window.handleLoadReversalScriptsRequest = handleLoadReversalScriptsRequest;
+window.handleReversalScriptsListMessage = handleReversalScriptsListMessage; 
+// handleReversalScriptSelected is an internal callback.
 
+window.handleScriptSelectDblClick = handleScriptSelectDblClick;
+window.handleLoadSelectedScript = handleLoadSelectedScript;
+window.handleBrowseUp = handleBrowseUp;
+window.handleBreadcrumbClick = handleBreadcrumbClick;
+window.handleScriptOptionsMessage = handleScriptOptionsMessage;
+window.handleCurrentEventUpdateMessage = handleCurrentEventUpdateMessage;
+window.handleKeyboardShortcuts = handleKeyboardShortcuts;
+window.clear_presenter_browse_path = clear_presenter_browse_path; // Called by ws_core.py
 
-console.log("presenter_script_handlers.js loaded.");
+console.log("presenter_script_handlers.js loaded/overwritten with reversal script logic.");

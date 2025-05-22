@@ -195,6 +195,48 @@
             <p><small>注: 该模式会随机选取语录，将语录中**最后一个全角逗号（，）前的部分**（包含 {} 参数）替换后作为弹幕发送给观众，**最后一个全角逗号（，）后的部分**将显示在“当前台词”区域作为您的提示。请确保数据库中的语录使用全角逗号分隔。</small></p>
         </div>
 
+        <!-- NEW: "怼黑粉" (Counter Black Fans) Single Action Section -->
+        <div class="danmaku-section"> <!-- Reusing danmaku-section style for consistency -->
+            <h2>怼黑粉 (单条回击)</h2> <!-- Title indicating single action -->
+            <div>
+                <button id="counterBlackFansBtn">获取怼黑粉语录</button> 
+            </div>
+            <p><small>注: 点击按钮将获取一条怼黑粉语录并显示在下方“弹幕结果”区域，可点击发送。</small></p>
+        </div>
+        <!-- "怼黑粉" (Counter Black Fans) Single Action Section End -->
+
+        <!-- NEW: "欢迎大哥" (Welcome Big Brother) Specific Section -->
+        <div class="danmaku-section">
+            <h2>欢迎大哥</h2>
+            <div>
+                <label for="bigBrotherNameInput">大哥昵称:</label>
+                <input type="text" id="bigBrotherNameInput" placeholder="输入大哥昵称..." style="flex-grow: 1;">
+            </div>
+            <div>
+                <button id="sendWelcomeBigBrotherBtn">发送欢迎大哥弹幕</button>
+            </div>
+            <p><small>注: 点击按钮将使用预设模板发送欢迎大哥的弹幕。</small></p>
+        </div>
+        <!-- "欢迎大哥" (Welcome Big Brother) Specific Section End -->
+
+        <!-- NEW: "感谢大哥礼物" (Thank Big Brother for Gift) Section -->
+        <div class="danmaku-section">
+            <h2>感谢大哥礼物</h2>
+            <div>
+                <label for="giftThanksBigBrotherNameInput">大哥昵称:</label>
+                <input type="text" id="giftThanksBigBrotherNameInput" placeholder="输入大哥昵称..." style="flex-grow: 1;">
+            </div>
+            <div>
+                <label for="giftThanksGiftNameInput">礼物名称:</label>
+                <input type="text" id="giftThanksGiftNameInput" placeholder="输入礼物名称..." style="flex-grow: 1;">
+            </div>
+            <div>
+                <button id="sendGiftThanksBtn">发送感谢大哥礼物弹幕</button>
+            </div>
+            <p><small>注: 点击按钮将使用预设模板发送感谢大哥礼物的弹幕。</small></p>
+        </div>
+        <!-- "感谢大哥礼物" (Thank Big Brother for Gift) Section End -->
+
         <!-- 新增欢迎/感谢大哥按钮区域 -->
         <div class="danmaku-section">
             <h2>大哥弹幕</h2>
@@ -251,6 +293,20 @@
         </div>
         <!-- NEW Section End -->
 
+        <!-- NEW: "反转主播名" (Reversed Anchor Name) Script Mode Section -->
+        <div class="reversal-section"> <!-- Reusing reversal-section style for consistency -->
+            <h2>反转主播名 (剧本模式)</h2>
+            <div>
+                <button id="loadReversalScriptsBtn">加载反转剧本列表</button>
+            </div>
+            <h4>主播提示部分:</h4>
+            <div id="presenterScriptLineDisplay" style="background-color: #e9ecef; border: 1px solid #ccc; padding: 10px; min-height: 40px; border-radius: 4px; white-space: pre-wrap;">
+                选择反转剧本后，您的提示将显示在此处。
+            </div>
+            <p><small>注: 点击上方按钮加载反转剧本列表。剧本的“弹幕部分”将显示在“弹幕结果”区域，点击其中一项后，“提示部分”将显示在此处。</small></p>
+        </div>
+        <!-- "反转主播名" (Reversed Anchor Name) Script Mode Section End -->
+
         <!-- NEW: Social_Topics Section -->
         <div class="captions-section">
              <h2>加载主题/段子 (Social_Topics)</h2>
@@ -267,6 +323,24 @@
               <p><small>注: 获取的结果会显示在上方的“弹幕结果”区域。</small></p>
         </div>
         <!-- NEW Section End -->
+
+        <!-- NEW: "欢迎吐槽" (Welcome Complaints) Section -->
+        <div class="danmaku-section"> <!-- Reusing danmaku-section style for consistency -->
+            <h2>欢迎吐槽</h2>
+            <div>
+                <label for="reversedAnchorNameInput">反转主播名:</label>
+                <input type="text" id="reversedAnchorNameInput" placeholder="输入反转主播名..." style="flex-grow: 1;">
+            </div>
+            <div>
+                <label for="themeEventNameInput">主题/事件名:</label>
+                <input type="text" id="themeEventNameInput" placeholder="输入主题/事件名..." style="flex-grow: 1;">
+            </div>
+            <div>
+                <button id="confirmComplaintsBtn">确定</button>
+            </div>
+            <p><small>注: 输入相关信息后点击“确定”按钮。</small></p>
+        </div>
+        <!-- "欢迎吐槽" Section End -->
 
 
     </div> <!-- end .container -->

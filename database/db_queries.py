@@ -73,17 +73,45 @@ def fetch_danmaku_from_db(db: Database | None, streamer_name: str | None, danmak
 
 
 def fetch_anti_fan_quotes_from_db(db: Database | None, limit: int = 3):
-    """Fetches anti-fan quotes."""
-    if db is None: return []
+    """Fetches a specified number of random anti-fan quotes from the Anti_Fan_Quotes collection."""
+    if db is None:
+        logging.warning("db_queries: Cannot fetch anti-fan quotes. DB object is None.")
+        return []
 
-    # 修改投影，使用正确的字段名 "quote_text"
-    projection = {"quote_text": 1, "_id": 0}
+    collection_name = db_config.ANTI_FAN_COLLECTION
+    field_to_extract = "quote_text" # Field containing the quote
 
-    docs = _fetch_documents_from_db(db, db_config.ANTI_FAN_COLLECTION, {}, limit, projection)
-
-    # 修改数据提取，使用正确的字段名 "quote_text"
-    # Also ensure the extracted value is a non-empty string before including
-    return [doc.get("quote_text", "") for doc in docs if doc and doc.get("quote_text") and isinstance(doc.get("quote_text"), str)]
+    try:
+        collection = db[collection_name]
+        
+        # Use $sample for random fetching
+        pipeline = [
+            {"$sample": {"size": limit}},
+            {"$project": {"_id": 0, field_to_extract: 1}}
+        ]
+        
+        cursor = collection.aggregate(pipeline)
+        docs = list(cursor)
+        
+        # Extract the text from the documents
+        quotes = [
+            doc.get(field_to_extract, "") for doc in docs 
+            if doc and doc.get(field_to_extract) and isinstance(doc.get(field_to_extract), str)
+        ]
+        
+        logging.debug(f"db_queries: Fetched {len(quotes)} random quotes from '{collection_name}'.")
+        return quotes
+        
+    except OperationFailure as e:
+        # Handle cases like empty collection or other DB operation errors
+        if "empty K Slices" in str(e) or (hasattr(e, 'code') and e.code == 26): # Common error for $sample on empty/small collection
+             logging.warning(f"db_queries: Collection '{collection_name}' might be empty or too small for $sample with limit {limit}. Error: {e}")
+        else:
+             logging.error(f"db_queries: OperationFailure fetching random quotes from '{collection_name}': {e}", exc_info=True)
+        return [] # Return empty list on error
+    except Exception as e:
+        logging.error(f"db_queries: An unexpected error occurred fetching random quotes from '{collection_name}': {e}", exc_info=True)
+        return []
 
 
 def fetch_reversal_copy_data_from_db(db: Database | None, streamer_name: str, limit: int = 10):
@@ -191,4 +219,258 @@ def get_random_danmaku_from_db(db: Database | None, collection_name: str, count:
         return []
     except Exception as e:
         logging.error(f"db_queries: Unexpected error fetching random danmaku from '{collection_name}': {e}", exc_info=True)
+        return []
+
+
+def fetch_complaints_data(db: Database | None, reversed_anchor_name: str | None, theme_event_name: str | None, total_limit: int = 10):
+    """
+    Fetches data for "Welcome Complaints" feature from multiple collections.
+    Aims for a combined total of `total_limit` items.
+    """
+    if db is None:
+        logging.warning("db_queries: Cannot fetch complaints data. DB object is None.")
+        return []
+
+    results = []
+    # Approx limit per collection, can be adjusted
+    # Ensure at least 1 if total_limit is small, e.g. total_limit=1, num_collections=4 -> limit_per_collection = 0. So, max(1, total_limit // num_collections)
+    num_collections = 4
+    limit_per_collection = max(1, total_limit // num_collections)
+    remaining_limit = total_limit
+
+    # Helper to build regex query
+    def build_regex_query(term: str | None):
+        return {"$regex": re.escape(term), "$options": "i"} if term and term.strip() else None
+
+    # 1. Welcome_Danmaku
+    if remaining_limit > 0:
+        query_welcome = {}
+        welcome_filters = []
+        regex_anchor = build_regex_query(reversed_anchor_name)
+        regex_theme = build_regex_query(theme_event_name)
+
+        if regex_anchor:
+            welcome_filters.append({"text": regex_anchor}) # Search anchor name in text content
+        if regex_theme:
+            welcome_filters.append({"text": regex_theme})  # Search theme name in text content
+        
+        if welcome_filters:
+            query_welcome["$or"] = welcome_filters # If either term matches in the text
+        
+        # If no search terms, query_welcome remains {} (fetch any) - this might be too broad.
+        # Let's only fetch if there's at least one term for Welcome/Mock, or make it configurable.
+        # For now, if filters exist, apply them. Otherwise, it fetches any.
+        
+        docs = _fetch_documents_from_db(db, db_config.WELCOME_COLLECTION, query_welcome, min(limit_per_collection, remaining_limit), {"text": 1, "_id": 0})
+        for doc in docs:
+            if doc and isinstance(doc.get("text"), str) and doc["text"].strip():
+                results.append(f"[欢迎] {doc['text']}")
+        remaining_limit = total_limit - len(results)
+
+    # 2. Mock_Danmaku
+    if remaining_limit > 0:
+        query_mock = {}
+        mock_filters = []
+        # Regex terms already built above
+        if regex_anchor:
+            mock_filters.append({"text": regex_anchor})
+        if regex_theme:
+            mock_filters.append({"text": regex_theme})
+
+        if mock_filters:
+            query_mock["$or"] = mock_filters
+            
+        docs = _fetch_documents_from_db(db, db_config.MOCK_COLLECTION, query_mock, min(limit_per_collection, remaining_limit), {"text": 1, "_id": 0})
+        for doc in docs:
+            if doc and isinstance(doc.get("text"), str) and doc["text"].strip():
+                results.append(f"[吐槽] {doc['text']}")
+        remaining_limit = total_limit - len(results)
+
+    # 3. Reversal_Copy
+    if remaining_limit > 0:
+        query_reversal = {}
+        reversal_filters = []
+        if regex_anchor:
+            reversal_filters.append({"source_name": regex_anchor})
+        if regex_theme:
+            reversal_filters.append({"danmaku_part": regex_theme}) # Search theme in danmaku_part
+        
+        if reversal_filters: # Only query if there's something to filter by for relevant fields
+            query_reversal["$and"] = reversal_filters # Must match both if both provided for their respective fields
+        
+        # If no relevant filters for this collection, query_reversal remains {} (fetch any)
+        # This might be too broad. Let's only fetch if there's at least one relevant term.
+        if query_reversal: # only fetch if query is not empty
+            docs = _fetch_documents_from_db(db, db_config.REVERSAL_COLLECTION, query_reversal, min(limit_per_collection, remaining_limit), {"danmaku_part": 1, "read_part": 1, "source_name":1, "_id": 0})
+            for doc in docs:
+                dp = doc.get("danmaku_part")
+                rp = doc.get("read_part")
+                sn = doc.get("source_name")
+                if dp and isinstance(dp, str) and dp.strip():
+                    results.append(f"[反转@{sn}] {dp} (提示: {rp or '无'})")
+            remaining_limit = total_limit - len(results)
+
+    # 4. Social_Topics (Generated_Captions)
+    if remaining_limit > 0:
+        query_captions = {}
+        captions_filters = []
+        if regex_theme: # Theme name for topic_name
+            captions_filters.append({"topic_name": regex_theme})
+        
+        # How to apply reversed_anchor_name to generated_danmaku array?
+        # This requires a more complex query, e.g., $elemMatch on generated_danmaku if regex_anchor is present.
+        # For simplicity now, only topic_name is the primary filter.
+        # If reversed_anchor_name is provided, we could filter the returned list of strings in Python.
+        
+        if captions_filters: # Only query if there's a theme to filter by
+            query_captions["$and"] = captions_filters
+        
+        if query_captions: # only fetch if query is not empty
+            # Fetching the whole document and then its list
+            docs = _fetch_documents_from_db(db, db_config.CAPTIONS_COLLECTION, query_captions, 1, {"generated_danmaku": 1, "topic_name": 1, "_id": 0})
+            if docs and isinstance(docs[0].get("generated_danmaku"), list):
+                topic_name = docs[0].get("topic_name", "未知主题")
+                danmakus = docs[0]["generated_danmaku"]
+                
+                # If reversed_anchor_name was provided, filter danmakus list here
+                filtered_danmakus = []
+                if regex_anchor:
+                    for d in danmakus:
+                        if isinstance(d, str) and re.search(regex_anchor["$regex"], d, re.IGNORECASE):
+                            filtered_danmakus.append(d)
+                else: # No anchor name filter, take all
+                    filtered_danmakus = [d for d in danmakus if isinstance(d, str) and d.strip()]
+
+                random.shuffle(filtered_danmakus)
+                count = 0
+                for item_text in filtered_danmakus:
+                    if len(results) < total_limit:
+                        results.append(f"[主题@{topic_name}] {item_text}")
+                        count += 1
+                        if count >= min(limit_per_collection, remaining_limit):
+                            break
+                    else:
+                        break
+            remaining_limit = total_limit - len(results)
+            
+    random.shuffle(results) # Shuffle combined results
+    return results[:total_limit]
+
+
+def fetch_big_brother_templates(db: Database | None, limit: int = 30):
+    """Fetches a specified number of random templates from the Big_Brothers collection."""
+    if db is None:
+        logging.warning("db_queries: Cannot fetch Big Brother templates. DB object is None.")
+        return []
+
+    collection_name = db_config.BIG_BROTHERS_COLLECTION
+    field_to_extract = "template"  # Field containing the template text
+
+    try:
+        collection = db[collection_name]
+        
+        # Use $sample for random fetching
+        pipeline = [
+            {"$sample": {"size": limit}},
+            {"$project": {"_id": 0, field_to_extract: 1}}
+        ]
+        
+        cursor = collection.aggregate(pipeline)
+        docs = list(cursor)
+        
+        templates = [
+            doc.get(field_to_extract, "") for doc in docs 
+            if doc and doc.get(field_to_extract) and isinstance(doc.get(field_to_extract), str)
+        ]
+        
+        logging.debug(f"db_queries: Fetched {len(templates)} random templates from '{collection_name}'.")
+        return templates
+        
+    except OperationFailure as e:
+        if "empty K Slices" in str(e) or (hasattr(e, 'code') and e.code == 26):
+             logging.warning(f"db_queries: Collection '{collection_name}' might be empty or too small for $sample with limit {limit}. Error: {e}")
+        else:
+             logging.error(f"db_queries: OperationFailure fetching random templates from '{collection_name}': {e}", exc_info=True)
+        return []
+    except Exception as e:
+        logging.error(f"db_queries: An unexpected error occurred fetching random templates from '{collection_name}': {e}", exc_info=True)
+        return []
+
+
+def fetch_reversal_scripts(db: Database | None, limit: int = 10):
+    """Fetches a specified number of random reversal scripts (danmaku_part) from the Reversal_Copy collection."""
+    if db is None:
+        logging.warning("db_queries: Cannot fetch reversal scripts. DB object is None.")
+        return []
+
+    collection_name = db_config.REVERSAL_COLLECTION
+    field_to_extract = "danmaku_part" 
+
+    try:
+        collection = db[collection_name]
+        
+        pipeline = [
+            {"$sample": {"size": limit}},
+            {"$project": {"_id": 0, field_to_extract: 1}}
+        ]
+        
+        cursor = collection.aggregate(pipeline)
+        docs = list(cursor)
+        
+        scripts = [
+            doc.get(field_to_extract, "") for doc in docs 
+            if doc and doc.get(field_to_extract) and isinstance(doc.get(field_to_extract), str)
+        ]
+        
+        logging.debug(f"db_queries: Fetched {len(scripts)} random reversal scripts from '{collection_name}'.")
+        return scripts
+        
+    except OperationFailure as e:
+        if "empty K Slices" in str(e) or (hasattr(e, 'code') and e.code == 26):
+             logging.warning(f"db_queries: Collection '{collection_name}' might be empty or too small for $sample with limit {limit}. Error: {e}")
+        else:
+             logging.error(f"db_queries: OperationFailure fetching random reversal scripts from '{collection_name}': {e}", exc_info=True)
+        return []
+    except Exception as e:
+        logging.error(f"db_queries: An unexpected error occurred fetching random reversal scripts from '{collection_name}': {e}", exc_info=True)
+        return []
+
+
+def fetch_gift_thanks_templates(db: Database | None, limit: int = 30):
+    """Fetches a specified number of random templates from the Gift_Thanks_Danmaku collection."""
+    if db is None:
+        logging.warning("db_queries: Cannot fetch Gift Thanks templates. DB object is None.")
+        return []
+
+    collection_name = db_config.GIFT_THANKS_COLLECTION
+    field_to_extract = "template"  # Field containing the template text
+
+    try:
+        collection = db[collection_name]
+        
+        # Use $sample for random fetching
+        pipeline = [
+            {"$sample": {"size": limit}},
+            {"$project": {"_id": 0, field_to_extract: 1}}
+        ]
+        
+        cursor = collection.aggregate(pipeline)
+        docs = list(cursor)
+        
+        templates = [
+            doc.get(field_to_extract, "") for doc in docs 
+            if doc and doc.get(field_to_extract) and isinstance(doc.get(field_to_extract), str)
+        ]
+        
+        logging.debug(f"db_queries: Fetched {len(templates)} random templates from '{collection_name}'.")
+        return templates
+        
+    except OperationFailure as e:
+        if "empty K Slices" in str(e) or (hasattr(e, 'code') and e.code == 26):
+             logging.warning(f"db_queries: Collection '{collection_name}' might be empty or too small for $sample with limit {limit}. Error: {e}")
+        else:
+             logging.error(f"db_queries: OperationFailure fetching random templates from '{collection_name}': {e}", exc_info=True)
+        return []
+    except Exception as e:
+        logging.error(f"db_queries: An unexpected error occurred fetching random templates from '{collection_name}': {e}", exc_info=True)
         return []

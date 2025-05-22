@@ -12,8 +12,11 @@ from .db_facade import (
     fetch_anti_fan_quotes,
     fetch_reversal_copy_data,
     fetch_social_topics_data,
-    get_random_danmaku # Make sure this is exposed if needed by handlers/routes
+    get_random_danmaku, # Make sure this is exposed if needed by handlers/routes
+    fetch_big_brother_templates # Add new facade function
 )
+# Import the new query function directly from db_queries
+from .db_queries import fetch_complaints_data # This was for a different feature
 
 # Expose the config module itself, or specific constants if preferred
 from . import db_config # To access constants like database.db_config.WELCOME_COLLECTION
@@ -30,6 +33,10 @@ __all__ = [
     'fetch_reversal_copy_data',
     'fetch_social_topics_data',
     'get_random_danmaku',
+    'fetch_complaints_data', 
+    'fetch_big_brother_templates', 
+    'fetch_gift_thanks_templates', 
+    'fetch_reversal_scripts', # Add new facade function
     # Config module (to access constants like database.db_config.WELCOME_COLLECTION)
     'db_config'
 ]

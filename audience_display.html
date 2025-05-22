@@ -33,14 +33,33 @@
              /* Add more styling like background, padding, border-radius if needed */
         }
 
-        /* Animation for moving from right to left */
-        @keyframes moveAcross {
+        /* Animation for moving from right to left (standard danmaku) */
+        @keyframes moveAcrossRightToLeft {
             from {
                 transform: translateX(100vw); /* Start outside right edge */
             }
             to {
-                transform: translateX(-100%); /* End outside left edge */
+                transform: translateX(-100%); /* End outside left edge - assuming text width is accounted for by this */
             }
+        }
+
+        /* NEW Animation for moving from left to right (Big Brother Welcome) */
+        @keyframes moveAcrossLeftToRight {
+            from {
+                transform: translateX(-100%); /* Start outside left edge */
+            }
+            to {
+                transform: translateX(100vw); /* End outside right edge */
+            }
+        }
+
+        .danmaku-item.big-brother-welcome {
+            color: #FFD700; /* Gold color for Big Brother */
+            /* Optionally different font size or other styles */
+            font-size: 2.2em; 
+            background-color: rgba(0,0,0,0.3);
+            padding: 5px 10px;
+            border-radius: 5px;
         }
 
         /* Example color classes for different types of danmaku */
@@ -118,9 +137,20 @@
                             // Handle incoming danmaku message
                             // data.text contains the danmaku string
                             // data.duration_ms might contain the animation duration
-                             console.log("Audience: Received danmaku:", data.text); // DEBUG
-                            displayDanmaku(data.text, data.duration_ms, data.is_roast); // Pass is_roast flag
+                             console.log("Audience: Received regular danmaku:", data.text); // DEBUG
+                            displayDanmaku(data.text, data.duration_ms, data.is_roast, false); // isBigBrotherWelcome = false
 
+                            break;
+                        
+                        case "display_big_brother_welcome":
+                            console.log("Audience: Received display_big_brother_welcome", data);
+                            handleDisplayBigBrotherWelcome(data.groups, data.duration_per_group_ms); // Reuse existing handler
+                            break;
+
+                        case "display_gift_thanks_danmaku": // New message type
+                            console.log("Audience: Received display_gift_thanks_danmaku", data);
+                            // Reusing the same display logic and styling as "Welcome Big Brother"
+                            handleDisplayBigBrotherWelcome(data.groups, data.duration_per_group_ms); 
                             break;
 
                         case "audience_display":
@@ -188,39 +218,51 @@
         }
 
         // Function to display danmaku on the screen
-        function displayDanmaku(text, duration_ms = 22000, isRoast = false) { // Default duration 22s
-            console.log(`Audience: Displaying danmaku: "${text}" with duration ${duration_ms}ms, isRoast: ${isRoast}`); // DEBUG
+        function displayDanmaku(text, duration_ms = 22000, isRoast = false, isBigBrotherWelcome = false) { 
+            console.log(`Audience: Displaying danmaku: "${text}" with duration ${duration_ms}ms, isRoast: ${isRoast}, isBB: ${isBigBrotherWelcome}`);
 
             const danmakuItem = document.createElement('div');
             danmakuItem.classList.add('danmaku-item');
             
-            // Add class based on type (optional, for styling)
-            if(isRoast) {
+            if (isBigBrotherWelcome) {
+                danmakuItem.classList.add('big-brother-welcome');
+            } else if(isRoast) {
                 danmakuItem.classList.add('roast');
-            } else {
-                 // Default color or other classes if needed
-                 // danmakuItem.classList.add('welcome'); // Example: Add welcome class if not roast
             }
             // Ensure a default color if no specific class is added or defined in CSS
-             if (!danmakuItem.classList.length) {
-                  danmakuItem.style.color = 'white'; // Default color if no type class matches
-             }
-
+            // This logic might need refinement if multiple classes can be added.
+            // For now, big-brother-welcome takes precedence if true.
+            if (!danmakuItem.classList.contains('big-brother-welcome') && !danmakuItem.classList.contains('roast')) {
+                 // danmakuItem.style.color = 'white'; // Default is white via .danmaku-item style
+            }
 
             danmakuItem.textContent = text;
 
             // Randomize vertical position (lane)
-            // Adjust the multiplier based on your desired number of lanes and font size
-            const laneCount = 8; // Example: divide screen height into 8 lanes
+            const laneCount = 8; 
             const laneHeight = window.innerHeight / laneCount;
-            const randomLane = Math.floor(Math.random() * laneCount);
+            // For Big Brother, maybe use top lanes or a more central position? For now, random.
+            let randomLane = Math.floor(Math.random() * laneCount);
+            // Ensure it's not too low for potentially larger BB welcome messages if padding/bg is added
+            if (isBigBrotherWelcome) {
+                 randomLane = Math.floor(Math.random() * (laneCount - 2)) + 1; // Avoid very top/bottom if desired
+            }
             danmakuItem.style.top = `${randomLane * laneHeight}px`;
 
-            // Set animation
-            const animationDuration = duration_ms / 1000; // Convert milliseconds to seconds
-            danmakuItem.style.animation = `moveAcross ${animationDuration}s linear forwards`;
 
-            // Add danmaku to the container
+            // Set animation
+            const animationDuration = duration_ms / 1000; 
+            const animationName = isBigBrotherWelcome ? 'moveAcrossLeftToRight' : 'moveAcrossRightToLeft';
+            danmakuItem.style.animation = `${animationName} ${animationDuration}s linear forwards`;
+            
+            // Adjust starting horizontal position based on animation direction
+            if (isBigBrotherWelcome) {
+                // For left-to-right, it starts at -100% (handled by keyframes)
+                // No specific style needed here for initial horizontal pos if keyframes handle it.
+            } else {
+                // For right-to-left, it starts at 100vw (handled by keyframes)
+            }
+
             danmakuContainer.appendChild(danmakuItem);
 
             // Remove danmaku element after animation finishes
@@ -229,15 +271,44 @@
                 console.debug("Audience: Danmaku element removed after animation."); // DEBUG
             });
 
-            // Fallback removal in case animationend doesn't fire (e.g., element hidden or display none)
+            // Fallback removal in case animationend doesn't fire
              setTimeout(() => {
                  if (danmakuContainer.contains(danmakuItem)) {
                      danmakuItem.remove();
-                      console.debug("Audience: Danmaku element removed via fallback timeout."); // DEBUG
+                      console.debug(`Audience: Danmaku element "${text}" removed via fallback timeout.`); 
                  }
-             }, duration_ms + 1000); // Add a small buffer
+             }, duration_ms + 1000); 
 
 
+        }
+
+        async function handleDisplayBigBrotherWelcome(groups, duration_per_group_ms) {
+            console.log("Audience: Processing Big Brother welcome groups.");
+            if (!Array.isArray(groups)) {
+                console.error("Audience: Invalid groups data for Big Brother welcome.");
+                return;
+            }
+
+            for (let i = 0; i < groups.length; i++) {
+                const group = groups[i];
+                if (Array.isArray(group)) {
+                    console.log(`Audience: Displaying Big Brother welcome group ${i + 1} with ${group.length} comments.`);
+                    // Display all comments in the group simultaneously or with minimal stagger
+                    group.forEach((comment, index) => {
+                        // Small delay for each comment in the group to avoid all starting at exact same pixel
+                        setTimeout(() => {
+                            displayDanmaku(comment, duration_per_group_ms, false, true); // isRoast=false, isBigBrotherWelcome=true
+                        }, index * 200); // Stagger start by 200ms within the group
+                    });
+
+                    // Wait for the current group's duration before starting the next group
+                    if (i < groups.length - 1) {
+                        console.log(`Audience: Waiting ${duration_per_group_ms / 1000}s for next Big Brother group.`);
+                        await new Promise(resolve => setTimeout(resolve, duration_per_group_ms));
+                    }
+                }
+            }
+            console.log("Audience: Finished displaying all Big Brother welcome groups.");
         }
 
 

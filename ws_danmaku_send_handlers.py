@@ -682,6 +682,9 @@ def register_danmaku_send_handlers():
 
         "auto_send_danmaku": handle_auto_send_danmaku, # Handles Welcome/Mock auto-send
         "send_boss_danmaku": handle_send_boss_danmaku, # Handles Welcome/Thanks Boss auto-send
+        "send_selected_complaint_to_audience": handle_send_selected_complaint_to_audience, 
+        "send_selected_anti_fan_quote_to_audience": handle_send_selected_anti_fan_quote_to_audience,
+        "send_reversal_audience_part": handle_send_reversal_audience_part, # New handler
     }
 
     logging.info(f"ws_danmaku_send_handlers: Registering send handlers: {list(handlers.keys())}")

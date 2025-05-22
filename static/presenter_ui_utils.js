@@ -165,8 +165,9 @@ function clearOutputArea() {
 // list: Array of items (strings or objects).
 // title: String, title for the list (e.g., "欢迎弹幕").
 // itemFormatter: Optional function (item, index) => string, to format each item's HTML.
+// onItemClick: Optional function (itemText, originalItem) => void, callback for when an item is clicked.
 // Assumes updateStatus is globally available via window.updateStatus.
-function displayFetchedList(list, title, itemFormatter) {
+function displayFetchedList(list, title, itemFormatter, onItemClick) { // Added onItemClick
     if (!window.danmakuOutputArea) { // Check element exists
         console.warn("UI_Utils: danmakuOutputArea element not found for displayFetchedList.");
         return;
@@ -202,13 +203,35 @@ function displayFetchedList(list, title, itemFormatter) {
        // Use the formatter function or default to plain text string
        // Ensure item is not null/undefined before passing to formatter
        const formattedContent = itemFormatter ? itemFormatter(item, index) : `(${index + 1}) ${item}`;
-       itemElement.innerHTML = formattedContent;
+       itemElement.innerHTML = formattedContent; // Use innerHTML to allow HTML in formattedContent
+
+       // Add click listener if onItemClick is provided
+       if (typeof onItemClick === 'function') {
+           itemElement.style.cursor = 'pointer'; // Indicate it's clickable
+           itemElement.addEventListener('click', () => {
+               // Extract text content for sending, or pass the raw item
+               // For simplicity, let's assume the formattedContent (or a part of it) is what we want to send.
+               // If the item is an object, the handler might want the original item.
+               // The current complaint items are strings like "[来源] 内容". We want to send "内容".
+               let textToSend = item; // Default to the original item string
+               if (typeof item === 'string' && item.includes("] ")) {
+                   textToSend = item.substring(item.indexOf("] ") + 2);
+               } else if (typeof item === 'object' && item.text) { // Example if item was an object
+                   textToSend = item.text;
+               }
+               // If item itself is what's needed by the click handler (e.g. an object for reversal)
+               // the handler should be designed to expect 'item'.
+               // For sending complaint text, we extract it.
+               onItemClick(textToSend, item); 
+           });
+            itemElement.title = "点击发送此条到观众侧"; // Tooltip
+       }
 
        window.danmakuOutputArea.appendChild(itemElement);
    });
 
-    if (typeof window.updateStatus === 'function') window.updateStatus(`${title} 加载完成，共 ${list.length} 条。`, "success");
-    console.debug(`UI_Utils: Displayed ${list.length} items for "${title}".`);
+    if (typeof window.updateStatus === 'function') window.updateStatus(`${title} 加载完成，共 ${list.length} 条。点击条目可发送到观众侧。`, "success");
+    console.debug(`UI_Utils: Displayed ${list.length} items for "${title}". Clickable if handler provided.`);
 }
 
 // Handles click on the output area to copy content to clipboard.

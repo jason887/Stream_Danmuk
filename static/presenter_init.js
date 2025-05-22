@@ -58,7 +58,27 @@ document.addEventListener('DOMContentLoaded', () => {
      window.danmakuOutputArea = document.getElementById('danmaku_output_area');
      window.autoSendDanmakuBtn = document.getElementById('autoSendDanmakuBtn'); // Auto send button
  
+     // "欢迎吐槽" (Welcome Complaints) Elements
+     window.reversedAnchorNameInput = document.getElementById('reversedAnchorNameInput');
+     window.themeEventNameInput = document.getElementById('themeEventNameInput');
+     window.confirmComplaintsBtn = document.getElementById('confirmComplaintsBtn');
  
+     // "怼黑粉" (Counter Black Fans) Elements
+     window.counterBlackFansBtn = document.getElementById('counterBlackFansBtn');
+
+     // "欢迎大哥" (Welcome Big Brother) Specific Elements
+     window.bigBrotherNameInput = document.getElementById('bigBrotherNameInput');
+     window.sendWelcomeBigBrotherBtn = document.getElementById('sendWelcomeBigBrotherBtn');
+
+     // "感谢大哥礼物" (Thank Big Brother for Gift) Elements
+     window.giftThanksBigBrotherNameInput = document.getElementById('giftThanksBigBrotherNameInput');
+     window.giftThanksGiftNameInput = document.getElementById('giftThanksGiftNameInput');
+     window.sendGiftThanksBtn = document.getElementById('sendGiftThanksBtn');
+
+     // "反转主播名" (Reversed Anchor Name) Script Mode Elements
+     window.loadReversalScriptsBtn = document.getElementById('loadReversalScriptsBtn');
+     window.presenterScriptLineDisplay = document.getElementById('presenterScriptLineDisplay');
+
      // STATUS section (assuming these exist in HTML)
      // These references are primarily used by updateStatus in presenter_core.js and ui_utils.js
      window.statusMessageDiv = document.getElementById('status-message');
@@ -78,6 +98,21 @@ document.addEventListener('DOMContentLoaded', () => {
      console.log("streamerSearchInput:", window.streamerSearchInput ? "Found" : "Not Found");
      console.log("danmakuOutputArea:", window.danmakuOutputArea ? "Found" : "Not Found");
      console.log("autoSendDanmakuBtn:", window.autoSendDanmakuBtn ? "Found" : "Not Found");
+     // Log Welcome Complaints elements
+     console.log("reversedAnchorNameInput:", window.reversedAnchorNameInput ? "Found" : "Not Found");
+     console.log("themeEventNameInput:", window.themeEventNameInput ? "Found" : "Not Found");
+     console.log("confirmComplaintsBtn:", window.confirmComplaintsBtn ? "Found" : "Not Found");
+     console.log("counterBlackFansBtn:", window.counterBlackFansBtn ? "Found" : "Not Found"); 
+     // Log Welcome Big Brother elements
+     console.log("bigBrotherNameInput:", window.bigBrotherNameInput ? "Found" : "Not Found");
+     console.log("sendWelcomeBigBrotherBtn:", window.sendWelcomeBigBrotherBtn ? "Found" : "Not Found");
+     // Log Thank Big Brother for Gift elements
+     console.log("giftThanksBigBrotherNameInput:", window.giftThanksBigBrotherNameInput ? "Found" : "Not Found");
+     console.log("giftThanksGiftNameInput:", window.giftThanksGiftNameInput ? "Found" : "Not Found");
+     console.log("sendGiftThanksBtn:", window.sendGiftThanksBtn ? "Found" : "Not Found");
+     // Log Reversed Anchor Name Script Mode elements
+     console.log("loadReversalScriptsBtn:", window.loadReversalScriptsBtn ? "Found" : "Not Found");
+     console.log("presenterScriptLineDisplay:", window.presenterScriptLineDisplay ? "Found" : "Not Found");
      console.log("advanceRoastBtn:", window.advanceRoastBtn ? "Found" : "Not Found"); // Add more checks
      console.log("exitRoastBtn:", window.exitRoastBtn ? "Found" : "Not Found"); // Add more checks
      console.log("sendThanksBossBtn:", window.sendThanksBossBtn ? "Found" : "Not Found"); // Add more checks
@@ -411,6 +446,37 @@ document.addEventListener('DOMContentLoaded', () => {
           console.log("presenter_init.js: danmakuOutputArea click listener added.");
      } else { console.warn("presenter_init.js: danmakuOutputArea element not found, listener not added."); }
  
+    // "欢迎吐槽" (Welcome Complaints) Button
+    // Assumes confirmComplaintsBtn is global and handleFetchComplaintsDanmaku is global handler.
+    if (window.confirmComplaintsBtn) {
+        window.confirmComplaintsBtn.addEventListener('click', window.handleFetchComplaintsDanmaku);
+        console.log("presenter_init.js: confirmComplaintsBtn click listener added.");
+    } else { console.warn("presenter_init.js: confirmComplaintsBtn element not found, listener not added."); }
+
+    // "怼黑粉" (Counter Black Fans) Button
+    if (window.counterBlackFansBtn) {
+        window.counterBlackFansBtn.addEventListener('click', window.handleFetchAntiFanQuotesRequest); 
+        console.log("presenter_init.js: counterBlackFansBtn click listener added.");
+    } else { console.warn("presenter_init.js: counterBlackFansBtn element not found, listener not added."); }
+
+    // "欢迎大哥" (Welcome Big Brother) Button
+    if (window.sendWelcomeBigBrotherBtn) {
+        window.sendWelcomeBigBrotherBtn.addEventListener('click', window.handleSendWelcomeBigBrotherRequest); 
+        console.log("presenter_init.js: sendWelcomeBigBrotherBtn click listener added.");
+    } else { console.warn("presenter_init.js: sendWelcomeBigBrotherBtn element not found, listener not added."); }
+
+    // "感谢大哥礼物" (Thank Big Brother for Gift) Button
+    if (window.sendGiftThanksBtn) {
+        window.sendGiftThanksBtn.addEventListener('click', window.handleSendGiftThanksRequest); 
+        console.log("presenter_init.js: sendGiftThanksBtn click listener added.");
+    } else { console.warn("presenter_init.js: sendGiftThanksBtn element not found, listener not added."); }
+
+    // "反转主播名" (Reversed Anchor Name) Script Mode Button
+    if (window.loadReversalScriptsBtn) {
+        window.loadReversalScriptsBtn.addEventListener('click', window.handleLoadReversalScriptsRequest); // New handler to be created in presenter_script_handlers.js
+        console.log("presenter_init.js: loadReversalScriptsBtn click listener added.");
+    } else { console.warn("presenter_init.js: loadReversalScriptsBtn element not found, listener not added."); }
+
      // Optional Status click handlers
      // if (window.connectionStatusCircle) { window.connectionStatusCircle.addEventListener('click', window.handleConnectionStatusCircle); console.log("presenter_init.js: connectionStatusCircle click listener added."); }
      // if (window.statusMessageDiv) { window.statusMessageDiv.addEventListener('click', window.handleStatusMessage); console.log("presenter_init.js: statusMessageDiv click listener added."); }

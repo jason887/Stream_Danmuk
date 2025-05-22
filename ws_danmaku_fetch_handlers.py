@@ -8,8 +8,11 @@ import json
 
 # Import from the new database package
 
-from database import get_db_manager, db_config, search_streamer_names, fetch_danmaku, fetch_reversal_copy_data, fetch_social_topics_data, fetch_anti_fan_quotes
-
+from database import get_db_manager, db_config, search_streamer_names, fetch_danmaku, fetch_reversal_copy_data, fetch_social_topics_data, fetch_anti_fan_quotes, fetch_big_brother_templates, fetch_gift_thanks_templates, fetch_reversal_scripts
+# Import the new query function
+from database.db_queries import fetch_complaints_data # Direct import for clarity
+# For broadcasting to audience
+from ws_core import broadcast_message
 
 
 
@@ -247,7 +250,8 @@ async def handle_fetch_anti_fan_quotes(websocket, data):
 
         # Use the facade function, it's synchronous
         # Assumes fetch_anti_fan_quotes queries Anti_Fan_Quotes collection
-        quotes_list = fetch_anti_fan_quotes(limit=10) # Fetch 10 for general display, roast mode fetches 3
+        # For the "怼黑粉" (Counter Black Fans) button, fetch 3 quotes as per requirement.
+        quotes_list = fetch_anti_fan_quotes(limit=3) 
 
 
 
@@ -404,6 +408,10 @@ def register_danmaku_fetch_handlers():
         
         "search_streamers": handle_search_streamers,             # For streamer name autocomplete
         "search_topics": handle_search_topics,                   # For topic/theme name autocomplete
+        "fetch_complaints_danmaku": handle_fetch_complaints_danmaku_request, 
+        "fetch_big_brother_welcome": handle_fetch_big_brother_welcome_request,
+        "fetch_gift_thanks_danmaku": handle_fetch_gift_thanks_danmaku_request,
+        "fetch_reversal_scripts_request": handle_fetch_reversal_scripts_request, # New handler
     }
 
     logging.info(f"ws_danmaku_fetch_handlers: Registering fetch handlers: {list(handlers.keys())}")

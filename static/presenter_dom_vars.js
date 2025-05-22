@@ -19,6 +19,21 @@ let fetchWelcomeDanmakuBtn, fetchRoastDanmakuBtn, fetchReversalBtn, fetchCaption
 let danmakuOutputArea; // Common output area for fetched lists
 let autoSendDanmakuBtn; // Auto send button for fetched Welcome/Mock
 
+// "欢迎吐槽" (Welcome Complaints) Elements
+let reversedAnchorNameInput, themeEventNameInput, confirmComplaintsBtn;
+
+// "怼黑粉" (Counter Black Fans) Elements
+let counterBlackFansBtn;
+
+// "欢迎大哥" (Welcome Big Brother) Specific Elements
+let bigBrotherNameInput, sendWelcomeBigBrotherBtn;
+
+// "感谢大哥礼物" (Thank Big Brother for Gift) Elements
+let giftThanksBigBrotherNameInput, giftThanksGiftNameInput, sendGiftThanksBtn;
+
+// "反转主播名" (Reversed Anchor Name) Script Mode Elements
+let loadReversalScriptsBtn, presenterScriptLineDisplay;
+
 // Status Display Elements (Declared here, assigned in presenter_init.js, used by presenter_core.js and ui_utils)
 let statusMessageDiv;
 let connectionStatusCircle, connectionStatusCircleFooter, statusTextFooter; // References to status elements

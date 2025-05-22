@@ -81,6 +81,30 @@ async def get_random_danmaku(collection_name: str, count: int):
         return await db_queries.get_random_danmaku_from_db(db, collection_name, count)
     return []
 
+
+def fetch_big_brother_templates(limit: int = 30):
+    """Fetches Big Brother welcome templates via the facade."""
+    db = _get_db_or_log_error()
+    if db is not None:
+        return db_queries.fetch_big_brother_templates(db, limit)
+    return []
+
+
+def fetch_gift_thanks_templates(limit: int = 30):
+    """Fetches Gift Thanks templates via the facade."""
+    db = _get_db_or_log_error()
+    if db is not None:
+        return db_queries.fetch_gift_thanks_templates(db, limit)
+    return []
+
+
+def fetch_reversal_scripts(limit: int = 10):
+    """Fetches reversal scripts (danmaku_part) via the facade."""
+    db = _get_db_or_log_error()
+    if db is not None:
+        return db_queries.fetch_reversal_scripts(db, limit)
+    return []
+
 # Make sure db_config is exposed for access to collection names
 # Example: database.db_config.ANTI_FAN_COLLECTION
 __all__ = [
@@ -94,6 +118,9 @@ __all__ = [
     'fetch_reversal_copy_data',
     'fetch_social_topics_data',
     'get_random_danmaku',
+    'fetch_big_brother_templates', 
+    'fetch_gift_thanks_templates', 
+    'fetch_reversal_scripts', # Add new function
     'db_config' # Expose db_config
 ]
 
