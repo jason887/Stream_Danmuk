@@ -25,8 +25,8 @@ MONGO_URI = os.getenv("mongodb_url")
 DB_NAME = "trae_data"
 
 # --- WebSocket Core Configuration (Moved from ws_core.py if they were there) ---
-PING_INTERVAL = 25  # 服务器每25秒发送一次 PING 
-PING_TIMEOUT_FOR_WEBSOCKETS_LIB = 20 # 服务器发送PING后，等待PONG的最长时间为20秒 
+PING_INTERVAL = 20  # 例如，服务器每20秒发送一次 PING 
+PING_TIMEOUT_FOR_WEBSOCKETS_LIB = 30 # 例如，服务器发送PING后，等待PONG的最长时间为30秒 
 # TIMEOUT_DURATION = 100 # 自定义心跳用的，现在不需要了，可以注释或删除 
 
 # --- Danmaku Send Configuration (Moved from ws_danmaku_send_handlers.py) ---
