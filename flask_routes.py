@@ -1,9 +1,13 @@
 # flask_routes.py
 
-from flask import Flask, jsonify, request, Blueprint # 在这里加上 Blueprint 的导入
-
+from flask import Flask, jsonify, request, send_from_directory, Blueprint
 import logging
 import re
+
+# --- 全局变量或辅助函数 (如果需要) --- 
+db_manager = None 
+state_manager = None 
+broadcast_func = None 
 
 # Import necessary components from the database package
 # Keep necessary imports from database facade and config
@@ -21,24 +25,18 @@ _broadcast_message = None
 _streamer_names_list = []
 
 
-def init_flask_routes(db_manager_instance, state_manager_instance, broadcast_message_func):
-    """
-    Initializes Flask routes module with necessary dependencies.
-    Fetches initial list of streamer names for search suggestions if DB is connected.
-    Accepts db_manager_instance and state_manager_instance to ensure they are initialized,
-    but stores only state_manager_instance and broadcast_message_func globally.
-    DB access within routes will use get_db_manager().
-    """
-    logging.info("flask_routes: Initializing Flask routes module with dependencies.")
-    global _state_manager, _broadcast_message, _streamer_names_list
-
-    _state_manager = state_manager_instance
-    _broadcast_message = broadcast_message_func
+def init_flask_routes(db_m, state_m, broadcast_f):
+    global db_manager, state_manager, broadcast_func, _state_manager, _broadcast_message, _streamer_names_list
+    db_manager = db_m 
+    state_manager = state_m 
+    broadcast_func = broadcast_f
+    _state_manager = state_m
+    _broadcast_message = broadcast_f
 
     # Fetch initial list of streamer names for the search suggestions
     # Use the database facade function, NOT the db_manager_instance directly for the query
     # Check if the instance is connected before attempting the fetch via facade
-    if db_manager_instance and db_manager_instance.is_connected():
+    if db_manager and db_manager.is_connected():
         try:
              # CALL THE FACADE FUNCTION HERE
              _streamer_names_list = search_streamer_names(term="", limit=0)
@@ -57,8 +55,8 @@ def init_flask_routes(db_manager_instance, state_manager_instance, broadcast_mes
 
 
 # Function to register routes on the Flask app instance
-def register_flask_routes(app):
-    """Registers the API endpoints with the provided Flask app instance."""
+# 修改 register_flask_routes 函数的定义
+def register_flask_routes(flask_app_instance):
     logging.info("flask_routes: Registering Flask routes.")
 
     # Define Flask Blueprint
@@ -279,14 +277,14 @@ def register_flask_routes(app):
 
 
     # Register the blueprint with the app
-    app.register_blueprint(api_bp)
+    flask_app_instance.register_blueprint(api_bp)
+
+    logging.info("flask_routes: Flask routes registered using the provided app instance.")
 
 
-    logging.info("flask_routes: Flask routes registered.")
-
-
-# Expose the necessary components for server.py
+# From __all__ 列表中移除 'app'
 __all__ = [
     'init_flask_routes',
     'register_flask_routes',
+    # 'app' 已移除
 ]

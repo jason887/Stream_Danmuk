@@ -106,42 +106,58 @@ function handleExitRoastMode() {
 // data: { target_name, total_roasts, message, context }
 // Assumes global DOM variables are assigned.
 // Assumes disableAutoSendButtons, reEnableAutoSendButtons are available via window.*
-function handleRoastSequenceReadyMessage(data) {
-    console.debug("Roast_Handlers: Received roast_sequence_ready:", data);
-    if (window.roastStatusDiv) window.roastStatusDiv.textContent = data.message || `已为 ${data.target_name || '目标'} 加载 ${data.total_roasts} 条语录，点击 '发送弹幕并看下一提示' 开始。`;
-    if (typeof window.updateStatus === 'function') window.updateStatus("怼人序列就绪。", "success");
+function handleRoastSequenceReadyMessage(data) { 
+    console.debug("Roast_Handlers: Received roast_sequence_ready:", data); 
+    if (window.roastStatusDiv) window.roastStatusDiv.textContent = data.message || `已为 ${data.target_name || '目标'} 加载 ${data.total_roasts} 条语录，点击 '发送弹幕并看下一提示' 开始。`; 
+    if (typeof window.updateStatus === 'function') window.updateStatus("怼人序列就绪。", "success"); 
 
-    // Hide start button, show advance and exit buttons
-    if (window.startRoastBtn) window.startRoastBtn.style.display = 'none';
-    if (window.advanceRoastBtn) {
-         window.advanceRoastBtn.style.display = 'inline-block';
-         window.advanceRoastBtn.disabled = false; // Enable advance
-    } else console.warn("Roast_Handlers: advanceRoastBtn element not found for sequence ready.");
+    // 隐藏开始按钮，显示前进和退出按钮 
+    if (window.startRoastBtn) window.startRoastBtn.style.display = 'none'; 
+    if (window.advanceRoastBtn) { 
+        window.advanceRoastBtn.style.display = 'inline-block'; 
+        window.advanceRoastBtn.disabled = false; // 启用前进 
+    } else console.warn("Roast_Handlers: advanceRoastBtn element not found for sequence ready."); 
 
-    if (window.exitRoastBtn) {
-         window.exitRoastBtn.style.display = 'inline-block';
-         window.exitRoastBtn.disabled = false; // Enable exit
-    } else console.warn("Roast_Handlers: exitRoastBtn element not found for sequence ready.");
+    if (window.exitRoastBtn) { 
+        window.exitRoastBtn.style.display = 'inline-block'; 
+        window.exitRoastBtn.disabled = false; // 启用退出 
+    } else console.warn("Roast_Handlers: exitRoastBtn element not found for sequence ready."); 
 
+    if (window.roastTargetNameInput) window.roastTargetNameInput.disabled = true; 
 
-    if (window.roastTargetNameInput) window.roastTargetNameInput.disabled = true; // Keep input disabled during sequence
-     else console.warn("Roast_Handlers: roastTargetNameInput element not found for sequence ready.");
+    // FIX: 如果收到初始语录内容，立即更新 currentLineDiv 和 currentPromptDiv 
+    if (data.initial_presenter_line !== undefined && data.initial_raw_template !== undefined) { 
+        if (window.currentLineDiv) window.currentLineDiv.textContent = data.initial_presenter_line || ""; 
+        if (window.currentPromptDiv) window.currentPromptDiv.textContent = `[${data.initial_roast_num}/${data.initial_total_roasts}] 原文: ${data.initial_raw_template || ''}`; 
+        console.log("Roast_Handlers: Updated initial currentLineDiv to:", window.currentLineDiv.textContent); 
+        console.log("Roast_Handlers: Updated initial currentPromptDiv to:", window.currentPromptDiv.textContent); 
+    } else { 
+        // 否则（如果后端没有发送初始语录内容，或者字段不存在），显示通用提示 
+        if (window.currentLineDiv) window.currentLineDiv.textContent = "进入怼黑粉模式..."; 
+        if (window.currentPromptDiv) window.currentPromptDiv.textContent = "请按'发送弹幕并看下一提示'按钮"; 
+    } 
 
-    // Disable script navigation/browsing and other auto-send buttons using the utility helper
-    if (typeof window.disableAutoSendButtons === 'function') window.disableAutoSendButtons();
-    else console.warn("Roast_Handlers: disableAutoSendButtons function not available.");
+    // 禁用脚本导航/浏览和其他自动发送按钮 
+    if (typeof window.disableAutoSendButtons === 'function') window.disableAutoSendButtons(); 
+    else console.warn("Roast_Handlers: disableAutoSendButtons function not available."); 
 
-    console.debug("Roast_Handlers: UI updated for sequence ready.");
+    console.debug("Roast_Handlers: UI updated for sequence ready."); 
 }
 
 // Handles message updating the presenter's prompt during the roast sequence.
 // data: { presenter_line, raw_template, current_roast_num, total_roasts, target_name, context }
 // Assumes global DOM variables are assigned.
-function handlePresenterRoastUpdateMessage(data) {
-    console.debug("Roast_Handlers: Received presenter_roast_update:", data);
-     // Update UI for the current roast step
-    if (window.currentLineDiv) window.currentLineDiv.textContent = data.presenter_line || ""; // Access global var
-    if (window.currentPromptDiv) window.currentPromptDiv.textContent = `[${data.current_roast_num}/${data.total_roasts}] 原文: ${data.raw_template || ''}`; // Access global var
+function handlePresenterRoastUpdateMessage(data) { 
+    console.debug("Roast_Handlers: Received presenter_roast_update:", data); 
+    // 确保更新 currentLineDiv 和 currentPromptDiv 
+    if (window.currentLineDiv) { 
+        window.currentLineDiv.textContent = data.presenter_line || ""; 
+        console.log("Roast_Handlers: Updated currentLineDiv to:", window.currentLineDiv.textContent); // 调试日志 
+    } 
+    if (window.currentPromptDiv) { 
+        window.currentPromptDiv.textContent = `[${data.current_roast_num}/${data.total_roasts}] 原文: ${data.raw_template || ''}`; 
+        console.log("Roast_Handlers: Updated currentPromptDiv to:", window.currentPromptDiv.textContent); // 调试日志 
+    } 
     if (window.roastStatusDiv) window.roastStatusDiv.textContent = `正在进行怼人序列 (${data.current_roast_num}/${data.total_roasts}) for ${data.target_name || ''}. 点击 '发送弹幕并看下一提示' 继续.`;
     if (typeof window.updateStatus === 'function') window.updateStatus("怼人步骤更新。", "info");
 

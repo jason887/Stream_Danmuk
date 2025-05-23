@@ -104,7 +104,8 @@ class ApplicationStateManager:
         self._roast_raw_template = raw_template 
 
         logging.debug(f"state_manager: Advanced roast sequence to index {current_index}. Total: {total_templates}. Target: {self._roast_target_name}") 
-        self._log_state() 
+        # FIX: 确保这一行也被删除或注释掉！ 
+        # self._log_state() 
 
         return True 
 
@@ -243,15 +244,12 @@ class ApplicationStateManager:
             self._roast_templates = []
             self._roast_target_name = None
             self._current_roast_index = -1
-            # 对应 _app_state['is_roast_mode']
-            # 由于类中没有直接对应的变量，这里不需要设置
-            # 但在 get_current_state 中会根据 _roast_target_name 判断
             self._roast_presenter_cue = ""
             self._roast_raw_template = ""
             self._roast_danmaku_sent = ""
-            self._log_state()  # Log current state
-            return True  # Indicate sequence was active and is now exited
-        return False  # Indicate no sequence was active
+            logging.debug("state_manager: Roast sequence state cleared.")
+            return True
+        return False
 
 
 # Function to be called by server.py to initialize the instance and set module global

@@ -29,15 +29,16 @@ let statusTextFooter; // Will be assigned in DOMContentLoaded
 function sendMessage(message) {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         websocket.send(JSON.stringify(message));
-         // console.log("Presenter_core: Sent via WebSocket:", message); // DEBUG - Can be noisy
     } else {
-        console.warn("Presenter_core: WebSocket is not open. Cannot send message:", message); // DEBUG
-        // Use core's updateStatus if available, otherwise basic console log
+        console.warn("Presenter_core: WebSocket is not open. Cannot send message:", message);
+        // 更明确地通知用户 
         if (typeof updateStatus === 'function') {
-             updateStatus("WebSocket未连接，无法发送消息。", "status");
-        } else {
-             console.error("Presenter_core: updateStatus function not available.");
-        }
+            updateStatus("WebSocket 连接已断开，请刷新页面或等待自动重连。", "error"); // 使用 error 类型 
+        } 
+        // 可以考虑在这里也禁用一些关键按钮，防止用户继续操作 
+        if (typeof window.disableAutoSendButtons === 'function') {
+            window.disableAutoSendButtons(); // 或者一个更通用的禁用函数 
+        } 
     }
 }
 
@@ -112,10 +113,7 @@ function connectWebSocket() {
     websocket.onopen = () => {
         console.log("Presenter_core: WebSocket onopen event. State:", websocket.readyState); // DEBUG
         // Update main status and bottom indicator
-        updateStatus("已连接到服务器，正在注册...", "success");
-
-        // Send initial registration message to the server
-        // sendMessage is defined in this file at the top level
+        updateStatus("已连接到服务器，正在注册...", "success"); // 确保 updateStatus 被调用 
         sendMessage({ action: "register", client_type: "presenter" }); // <--- Call sendMessage here
     };
 
@@ -159,15 +157,18 @@ function connectWebSocket() {
     websocket.onclose = (event) => {
         console.log(`Presenter_core: Disconnected from WebSocket. Code: ${event.code}, Reason: ${event.reason || 'No reason given'}, WasClean: ${event.wasClean}`); // DEBUG
         // Update main status and bottom indicator
-        updateStatus(`已从服务器断开 (代码: ${event.code})。`, "error");
+        updateStatus(`已从服务器断开 (代码: ${event.code})。正在尝试重连...`, "error"); // 使用 error 类型并提示重连 
 
-        // Clear any existing timer before starting a new one
+        // 立即禁用关键按钮 
+        if (typeof window.disableAutoSendButtons === 'function') {
+            window.disableAutoSendButtons();
+            console.log("Presenter_core: Buttons disabled due to WebSocket close.");
+        }
+        // 其他需要禁用的按钮也可以在这里处理 
+
         if (reconnectTimer) clearTimeout(reconnectTimer);
-
-        // Attempt to reconnect after a delay, unless it was a clean close (code 1000)
-        // or certain error codes where reconnecting might be futile (e.g., 1008 Policy Error, 1001 Going Away).
         if (event.code !== 1000 && event.code !== 1008 && event.code !== 1001) {
-             console.log(`Presenter_core: Attempting to reconnect in ${reconnectDelay / 1000} seconds...`); // DEBUG
+            console.log(`Presenter_core: Attempting to reconnect in ${reconnectDelay / 1000} seconds...`); // DEBUG
             reconnectTimer = setTimeout(connectWebSocket, reconnectDelay);
         } else {
              console.log(`Presenter_core: Disconnect code ${event.code}, not attempting reconnect.`);

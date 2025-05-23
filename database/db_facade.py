@@ -72,13 +72,13 @@ def fetch_social_topics_data(topic_name: str, limit: int = 10):
         return db_queries.fetch_social_topics_data_from_db(db, topic_name, limit)
     return []
 
-# This facade function must be async if the underlying db_queries function is async
-async def get_random_danmaku(collection_name: str, count: int):
+# FIX: Change to 'def' as the underlying db_queries function is synchronous
+def get_random_danmaku(collection_name: str, count: int):
     """Fetches random danmaku via the facade."""
     db = _get_db_or_log_error()
-    if db is not None: # <-- Corrected
-        # Assuming db_queries.get_random_danmaku_from_db is async
-        return await db_queries.get_random_danmaku_from_db(db, collection_name, count)
+    if db is not None:
+        # FIX: Remove 'await' as db_queries.get_random_danmaku_from_db is synchronous
+        return db_queries.get_random_danmaku_from_db(db, collection_name, count)
     return []
 
 # Make sure db_config is exposed for access to collection names

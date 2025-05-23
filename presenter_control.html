@@ -190,7 +190,10 @@
                 <input type="text" id="roastTargetName" placeholder="输入黑粉昵称">
                 <button id="startRoastBtn">开始怼人序列 (3条)</button>
             </div>
+            <!-- 确保这两个按钮的ID是正确的 -->
             <button id="advanceRoastBtn" style="display: none; background-color: #ffc107; color: black;">发送弹幕并看下一提示 (空格)</button>
+            <!-- FIX: 添加或确认这个退出按钮的ID -->
+            <button id="exitRoastBtn" style="display: none; background-color: #dc3545; color: white; margin-left: 10px;">退出怼人模式</button>
             <div id="roastStatus" style="white-space: pre-wrap; min-height: 20px;"></div>
             <p><small>注: 该模式会随机选取语录，将语录中**最后一个全角逗号（，）前的部分**（包含 {} 参数）替换后作为弹幕发送给观众，**最后一个全角逗号（，）后的部分**将显示在“当前台词”区域作为您的提示。请确保数据库中的语录使用全角逗号分隔。</small></p>
         </div>

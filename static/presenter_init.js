@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
      window.roastTargetNameInput = document.getElementById('roastTargetName');
      window.startRoastBtn = document.getElementById('startRoastBtn');
      window.advanceRoastBtn = document.getElementById('advanceRoastBtn');
-     window.exitRoastBtn = document.getElementById('exitRoastBtn');
+     window.exitRoastBtn = document.getElementById('exitRoastBtn'); // 确保这一行存在 
      window.roastStatusDiv = document.getElementById('roastStatus');
  
      // BOSS DANMAKU section
@@ -341,8 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
           window.exitRoastBtn.addEventListener('click', window.handleExitRoastMode);
           console.log("presenter_init.js: exitRoastBtn click listener added.");
      } else { console.warn("presenter_init.js: exitRoastBtn element not found, listener not added."); }
- 
- 
+     console.log("exitRoastBtn:", window.exitRoastBtn ? "Found" : "Not Found"); // 确认日志中是否显示为 "Found" 
      // Boss Danmaku
      // Assumes bossNicknameInput, giftNameInput, sendWelcomeBossBtn, sendThanksBossBtn are global
      // Assumes handleSendBossDanmaku is a global handler.

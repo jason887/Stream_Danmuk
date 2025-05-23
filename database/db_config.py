@@ -25,7 +25,7 @@ WELCOME_COLLECTION = "Welcome_Danmaku"
 MOCK_COLLECTION = "Mock_Danmaku"
 ANTI_FAN_COLLECTION = "Anti_Fan_Quotes"
 REVERSAL_COLLECTION = "Reversal_Copy"
-CAPTIONS_COLLECTION = "Social_Topics" # Collection for Social_Topics/Generated_Captions
+SOCIAL_TOPICS_COLLECTION = "Social_Topics" # 用于“加载主题/段子” (或者叫 Generated_Captions，取决于哪个集合包含 topic_name 和 generated_danmaku)
 BIG_BROTHERS_COLLECTION = "Big_Brothers"
 GIFT_THANKS_COLLECTION = "Gift_Thanks_Danmaku"
 

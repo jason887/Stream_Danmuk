@@ -177,31 +177,22 @@ function handleBreadcrumbClick(event) {
 // data: { script_filename, total_events, event_index, current_line, current_prompt, is_roast_mode, roast_target, roast_templates_count }
 // Assumes global DOM variables (window.*) are assigned.
 // Assumes updateProgress is globally available via window.updateProgress.
-function handleCurrentEventUpdateMessage(data) {
-    console.debug("Script_Handlers: Received current_event_update:", data);
-    // Update script info display
-    if (window.scriptNameSpan) window.scriptNameSpan.textContent = data.script_filename || "未加载";
-    if (window.totalEventsSpan) window.totalEventsSpan.textContent = data.total_events !== undefined && data.total_events >= 0 ? data.total_events : '-';
-    if (window.currentEventIndexSpan) window.currentEventIndexSpan.textContent = data.event_index !== undefined && data.event_index > -1 ? data.event_index + 1 : "-";
+function handleCurrentEventUpdateMessage(data) { 
+    console.debug("Script_Handlers: Received current_event_update:", data); 
 
-    // Update progress display using the helper function
-     if (typeof window.updateProgress === 'function') window.updateProgress(data.event_index, data.total_events);
-     else console.warn("Script_Handlers: updateProgress function not available.");
+    // Update script info display (these are always relevant) 
+    if (window.scriptNameSpan) window.scriptNameSpan.textContent = data.script_filename || "未加载"; 
+    if (window.totalEventsSpan) window.totalEventsSpan.textContent = data.total_events !== undefined && data.total_events >= 0 ? data.total_events : '-'; 
+    if (window.currentEventIndexSpan) window.currentEventIndexSpan.textContent = data.event_index !== undefined && data.event_index > -1 ? data.event_index + 1 : "-"; 
 
+    if (typeof window.updateProgress === 'function') window.updateProgress(data.event_index, data.total_events); 
 
-    // Update line/prompt display based on roast mode state
-    if (!data.is_roast_mode) {
-        if (window.currentLineDiv) window.currentLineDiv.textContent = data.current_line || "";
-        if (window.currentPromptDiv) window.currentPromptDiv.textContent = data.current_prompt || "-";
-         // When exiting roast mode, roastStatusDiv is cleared by handleRoastSequenceFinishedMessage
-    } else {
-         // If roast mode IS active, clear script lines and show roast info placeholders
-        if (window.currentLineDiv) window.currentLineDiv.textContent = "进入怼黑粉模式...";
-        if (window.currentPromptDiv) window.currentPromptDiv.textContent = "请按'发送弹幕并看下一提示'按钮"; // Initial prompt for roast
-         // Roast status is primarily updated by handleRoastSequenceReadyMessage and handlePresenterRoastUpdateMessage
-         // Clear script info if in roast mode? Or just line/prompt? Let's keep script info visible.
-    }
-
+    // FIX: 只有在非怼黑粉模式下才更新 currentLineDiv 和 currentPromptDiv 
+    if (!data.is_roast_mode) { 
+        if (window.currentLineDiv) window.currentLineDiv.textContent = data.current_line || ""; 
+        if (window.currentPromptDiv) window.currentPromptDiv.textContent = data.current_prompt || "-"; 
+    } 
+    // 移除怼黑粉模式下更新 currentLineDiv 和 currentPromptDiv 的逻辑
 
     // Enable/disable navigation buttons based on state and roast mode
     const scriptLoaded = data.total_events > 0;

@@ -25,8 +25,9 @@ MONGO_URI = os.getenv("mongodb_url")
 DB_NAME = "trae_data"
 
 # --- WebSocket Core Configuration (Moved from ws_core.py if they were there) ---
-PING_INTERVAL = 30 # Send PING every 30 seconds
-TIMEOUT_DURATION = PING_INTERVAL * 2 # Consider client timed out after 60 seconds without activity
+PING_INTERVAL = 25  # 服务器每25秒发送一次 PING 
+PING_TIMEOUT_FOR_WEBSOCKETS_LIB = 20 # 服务器发送PING后，等待PONG的最长时间为20秒 
+# TIMEOUT_DURATION = 100 # 自定义心跳用的，现在不需要了，可以注释或删除 
 
 # --- Danmaku Send Configuration (Moved from ws_danmaku_send_handlers.py) ---
 SEND_INTERVAL_MS = 2200 # Interval between sending individual danmaku within an auto-send group
@@ -51,9 +52,10 @@ def log_config():
     logging.info(f"  MONGO_URI (sanitized): {uri_to_log}")
     logging.info(f"  DB_NAME: {DB_NAME}")
     logging.info("-" * 20)
-    logging.info("WebSocket Heartbeat:")
-    logging.info(f"  PING Interval: {PING_INTERVAL}s")
-    logging.info(f"  Timeout Duration: {TIMEOUT_DURATION}s")
+    logging.info("WebSocket Heartbeat (Library Managed):")
+    logging.info(f"  PING Interval (server to client): {PING_INTERVAL}s")
+    logging.info(f"  PONG Timeout (server waits for PONG): {PING_TIMEOUT_FOR_WEBSOCKETS_LIB}s")
+    # logging.info(f"  Timeout Duration: {TIMEOUT_DURATION}s")
     logging.info("-" * 20)
     logging.info("Danmaku Send Timing:")
     logging.info(f"  Send Interval: {SEND_INTERVAL_MS}ms")

@@ -13,14 +13,18 @@ from flask_cors import CORS
 import time # For time.time() if needed
 
 # --- Configure Logging ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s: %(module)s - %(funcName)s: %(message)s')
 
 # --- Import Configuration ---
 try:
-    import config
+    import config # <--- 取消注释这一行
     config.log_config() # Log configuration on startup
-except ImportError:
-    logging.critical("Failed to import config.py. Ensure it exists.")
+    # from database.db_config import SOCIAL_TOPICS_COLLECTION # 暂时先注释掉这个，一步一步来
+except ImportError: # 捕获导入 config 失败的情况
+    logging.critical("Failed to import config.py. Ensure it exists and there are no circular imports.", exc_info=True)
+    sys.exit(1)
+except Exception as e: # 捕获 config.log_config() 可能发生的其他错误
+    logging.critical(f"Error during config loading or logging: {e}", exc_info=True)
     sys.exit(1)
 
 # --- Project Specific Modules ---
@@ -33,7 +37,7 @@ try:
     from state_manager import ApplicationStateManager, init_state_manager, get_state_manager # Also need getter now
 
     # Import core WebSocket dispatcher and helpers
-    from ws_core import init_ws_core, dispatch_message, unregister_client, broadcast_message, PRESENTER_CLIENTS, AUDIENCE_CLIENTS, periodic_heartbeat_and_timeout_check
+    from ws_core import init_ws_core, dispatch_message, unregister_client, broadcast_message, PRESENTER_CLIENTS, AUDIENCE_CLIENTS
 
     # Import init and register functions for all WebSocket handlers
     # These handlers now get DB/State via their getters
@@ -249,6 +253,8 @@ async def _broadcast_message_to_group(target_type, message):
         logging.debug(f"server: Broadcasting {message.get('type')} to presenter group ({len(clients_source)} total).")
     elif target_type == "audience":
         clients_source = AUDIENCE_CLIENTS
+        # 使用 INFO 级别确保能看到 
+        logging.info(f"server: Broadcasting to audience. AUDIENCE_CLIENTS size: {len(clients_source)}. Clients: {[str(c.remote_address) if c else 'None' for c in clients_source]}") 
         logging.debug(f"server: Broadcasting {message.get('type')} to audience group ({len(clients_source)} total).")
     elif target_type == "all":
         clients_source = PRESENTER_CLIENTS.union(AUDIENCE_CLIENTS)
@@ -343,42 +349,72 @@ async def start_servers():
     flask_thread.daemon = True # Daemonize thread so it exits when main thread exits
     flask_thread.start()
 
-    # 6. Start the WebSocket server
-    # Use config.WEBSOCKET_PORT
-    logging.info(f"server listening on 0.0.0.0:{config.WEBSOCKET_PORT}")
-    ws_server = await websockets.serve(
-        websocket_handler, # Your handler function
-        "0.0.0.0",         # Listen on all network interfaces
-        config.WEBSOCKET_PORT     # Port for WebSocket
-    )
-    logging.info(f"server: WebSocket server started on ws://0.0.0.0:{config.WEBSOCKET_PORT}")
+    # 6. Start the WebSocket server 
+    # Use config.WEBSOCKET_PORT 
+    logging.info(f"server listening on 0.0.0.0:{config.WEBSOCKET_PORT}") 
+     
+    # Configure logging for websockets library 
+    # 确保这些日志配置在你希望的位置，并且不会与其他日志配置冲突 
+    # logging.getLogger("websockets").setLevel(logging.DEBUG) 
+    # logging.getLogger("websockets").addHandler(logging.StreamHandler()) 
+    # 为了更精细控制，可以针对 server 和 protocol 分别设置 
+    server_logger = logging.getLogger("websockets.server") 
+    server_logger.setLevel(logging.DEBUG) # 或者 INFO 
+    if not server_logger.hasHandlers(): # 避免重复添加处理器 
+        server_logger.addHandler(logging.StreamHandler()) 
+ 
+    protocol_logger = logging.getLogger("websockets.protocol") 
+    protocol_logger.setLevel(logging.DEBUG) # 或者 INFO 
+    if not protocol_logger.hasHandlers(): # 避免重复添加处理器 
+        protocol_logger.addHandler(logging.StreamHandler()) 
+ 
+    class CustomServerProtocol(websockets.WebSocketServerProtocol): 
+        async def process_pong(self, data: bytes) -> None: 
+            # 你可以选择在这里记录PONG，或者完全依赖库的日志 
+            logging.debug(f"CustomServerProtocol: PONG received from {self.remote_address}. Data: {data!r} (Handled by library)") 
+            await super().process_pong(data) 
+            # 移除调用 update_client_activity
 
+    # ***** 将 websockets.serve 的结果赋值给 ws_server ***** 
+    ws_server = await websockets.serve( 
+        websocket_handler, # 注意这里是 websocket_handler 而不是 ws_handler_entry 
+        "0.0.0.0", 
+        config.WEBSOCKET_PORT, 
+        ping_interval=config.PING_INTERVAL, 
+        ping_timeout=config.PING_TIMEOUT_FOR_WEBSOCKETS_LIB, # 确保这个值在 config.py 中定义且合理 
+        create_protocol=CustomServerProtocol 
+    ) 
+    logging.info(f"server: WebSocket server started on ws://0.0.0.0:{config.WEBSOCKET_PORT}") 
+    logging.info(f"server: PING Interval: {config.PING_INTERVAL}s, PING Timeout (websockets lib): {getattr(config, 'PING_TIMEOUT_FOR_WEBSOCKETS_LIB', 'N/A')}s") 
+ 
+ 
     # 7. Start background cleanup tasks (e.g., heartbeat checks)
     logging.info("server: Background cleanup task starting.")
     # periodic_heartbeat_and_timeout_check needs access to client sets in ws_core and the unregister function
     # These are available via importing ws_core
-    cleanup_task = asyncio.create_task(periodic_heartbeat_and_timeout_check())
+    # 移除以下行
+    # cleanup_task = asyncio.create_task(periodic_heartbeat_and_timeout_check())
     logging.info("server: Background cleanup task started.")
 
     # Keep the asyncio loop running indefinitely
     logging.info("server: Application running. Press CTRL+C to quit")
     try:
-        await ws_server.wait_closed()
+        await ws_server.wait_closed() # 现在 ws_server 已定义 
     except asyncio.CancelledError:
         logging.info("server: Application task cancelled.")
     except Exception as e:
         logging.critical(f"server: Critical error in main asyncio execution: {e}", exc_info=True)
     finally:
         # Ensure cleanup task is cancelled on server shutdown
-        if cleanup_task and not cleanup_task.done():
-            logging.info("server: Cancelling cleanup task.")
-            cleanup_task.cancel()
-            try:
-                await cleanup_task
-            except asyncio.CancelledError:
-                pass # Expected
-            except Exception as e:
-                 logging.error(f"server: Error waiting for cleanup task cancellation: {e}")
+        # if cleanup_task and not cleanup_task.done():
+        #     logging.info("server: Cancelling cleanup task.")
+        #     cleanup_task.cancel()
+        #     try:
+        #         await cleanup_task
+        #     except asyncio.CancelledError:
+        #         pass  # Expected
+        #     except Exception as e:
+        #         logging.error(f"server: Error waiting for cleanup task cancellation: {e}")
 
         logging.info("server: WebSocket server stopping.")
 
