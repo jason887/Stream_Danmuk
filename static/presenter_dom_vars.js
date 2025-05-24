@@ -15,6 +15,8 @@ let bossNicknameInput, giftNameInput, sendWelcomeBossBtn, sendThanksBossBtn;
 
 // General Danmaku Fetch/Send Elements
 let streamerSearchInput, streamerSearchResultsDiv; // Search input and results div
+// 新增声明
+let streamerSearchInputReversal, reversalSearchResultsDiv;
 let fetchWelcomeDanmakuBtn, fetchRoastDanmakuBtn, fetchReversalBtn, fetchCaptionsBtn; // Fetch buttons
 let danmakuOutputArea; // Common output area for fetched lists
 let autoSendDanmakuBtn; // Auto send button for fetched Welcome/Mock

@@ -217,29 +217,29 @@
                 serverSendMessage({ action: "register", client_type: "audience" });
             };
 
-            newWsInstance.onmessage = (event) => {
-                // Critical check: Only process messages if this instance is THE active global websocket.
-                if (newWsInstance !== websocket) {
-                    console.warn(`Audience (ID: ${currentAttemptId}): Message received on an inactive/old WebSocket instance. Ignoring. Data:`, event.data);
-                    return;
-                }
-                try {
-                    const data = JSON.parse(event.data);
-                    const messageType = typeof data.type === 'string' ? data.type.trim() : data.type;
-                    switch (messageType) {
-                        case "registration_success":
-                            console.log(`Audience (ID: ${currentAttemptId}): Successfully registered as ${data.client_type}.`);
-                            break;
-                        case "danmaku":
-                            displayDanmaku(data.text, data.duration_ms, data.is_roast, data.image_path, data.audio_path);
-                            break;
-                        // Other cases like audience_display, info, warning, error, pong
-                        default:
-                            // console.log(`Audience (ID: ${currentAttemptId}): Received message type: ${messageType}`, data);
-                    }
-                } catch (e) {
-                    console.error(`Audience (ID: ${currentAttemptId}): Error processing message:`, e, event.data);
-                }
+            newWsInstance.onmessage = (event) => { 
+                if (newWsInstance !== websocket) { 
+                    console.warn(`Audience (ID: ${currentAttemptId}): Message received on an inactive/old WebSocket instance. Ignoring. Data:`, event.data); 
+                    return; 
+                } 
+                try { 
+                    const data = JSON.parse(event.data); 
+                    console.log(`Audience (ID: ${currentAttemptId}): Received message type: ${data.type}`, data); // Log received message 
+                    // switch (data.type) { // Temporarily comment out the switch 
+                    //     case "registration_success": 
+                    //         console.log(`Audience (ID: ${currentAttemptId}): Successfully registered as ${data.client_type}.`); 
+                    //         break; 
+                    //     case "danmaku": 
+                    //         注释掉 displayDanmaku 调用
+                    //         displayDanmaku(data.text, data.duration_ms, data.is_roast, data.image_path, data.audio_path); 
+                    console.log(`Audience (ID: ${currentAttemptId}): Danmaku message received, but display is temporarily disabled. Text: ${data.text}`); 
+                    //         break; 
+                    //     default: 
+                    //         // console.log(`Audience (ID: ${currentAttemptId}): Received message type: ${data.type}`, data); 
+                    // } 
+                } catch (e) { 
+                    console.error(`Audience (ID: ${currentAttemptId}): Error processing message:`, e, event.data); 
+                } 
             };
 
             newWsInstance.onerror = (error) => {

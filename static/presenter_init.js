@@ -11,8 +11,8 @@
 // Global utility functions (sendMessage, updateStatus, updateLoadButtonState, disableAutoSendButtons, etc.)
 // are assumed to be exposed by presenter_core.js and presenter_ui_utils.js onto the window object.
 
-document.addEventListener('DOMContentLoaded', () => {
-     console.log("presenter_init.js: DOM fully loaded. Starting initialization.");
+document.addEventListener('DOMContentLoaded', function() {
+     console.log("INIT.JS: DOM fully loaded. Starting initialization.");
  
      // --- Assign DOM Elements ---
      // Get elements by their IDs and assign them to the global variables declared in presenter_dom_vars.js.
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
      window.roastTargetNameInput = document.getElementById('roastTargetName');
      window.startRoastBtn = document.getElementById('startRoastBtn');
      window.advanceRoastBtn = document.getElementById('advanceRoastBtn');
-     window.exitRoastBtn = document.getElementById('exitRoastBtn'); // 确保这一行存在 
+     window.exitRoastBtn = document.getElementById('exitRoastBtn');
      window.roastStatusDiv = document.getElementById('roastStatus');
  
      // BOSS DANMAKU section
@@ -57,8 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
      window.fetchCaptionsBtn = document.getElementById('fetch_captions_btn');
      window.danmakuOutputArea = document.getElementById('danmaku_output_area');
      window.autoSendDanmakuBtn = document.getElementById('autoSendDanmakuBtn'); // Auto send button
- 
- 
+     
+     
      // STATUS section (assuming these exist in HTML)
      // These references are primarily used by updateStatus in presenter_core.js and ui_utils.js
      window.statusMessageDiv = document.getElementById('status-message');
@@ -66,8 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
      // Assuming you added these IDs for the bottom status
      window.connectionStatusCircleFooter = document.getElementById('connectionStatusCircleFooter');
      window.statusTextFooter = document.querySelector('.status-text-footer');
- 
- 
+     
+     
      // Log acquisition status for critical elements (保持这个日志，方便调试)
      console.log("presenter_init.js: DOM Elements acquisition status:");
      console.log("scriptSelect:", window.scriptSelect ? "Found" : "Not Found");
@@ -104,10 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
      console.log("totalEventsSpan:", window.totalEventsSpan ? "Found" : "Not Found");
      console.log("currentLineDiv:", window.currentLineDiv ? "Found" : "Not Found");
      console.log("currentPromptDiv:", window.currentPromptDiv ? "Found" : "Not Found");
- 
+     
      // --- Initialize UI Event Listeners ---
      initializeUIEventListeners(); // Call the function to bind listeners
- 
+     
      // --- Expose message handler to core ---
      // Make this module's message handler and re-enable utility available to presenter_core.js 
      // Assuming presenter_core.js looks for window.presenterFeatures 
@@ -117,8 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
              console.warn('reEnableAutoSendButtons is not defined.');
          } // Expose the re-enable utility 
      };
- 
- 
+     
+     
      // --- Set up the main message dispatcher ---
      // Provide the handleServerMessage function to presenter_core.js.
      // Assumes presenter_core.js exposes window.presenterCore.setMessageHandler.
@@ -128,18 +128,18 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
            console.error("presenter_init.js: presenterCore.setMessageHandler function not available. Message handling will fail.");
       }
- 
+     
      // --- Initial state requests ---
      // These requests are typically sent AFTER successful WebSocket registration.
      // The "registration_success" message is received by handleServerMessage,
      // which then triggers these initial requests.
      // No need to send them here at the very end of DOMContentLoaded.
- 
+     
      // Initial state for buttons that might be disabled.
      // The 're_enable_auto_send_buttons' message from the server after registration
      // will trigger the reEnableAutoSendButtons helper, which sets the initial button states correctly.
      // No need to explicitly call reEnableAutoSendButtons here at the very end.
- 
+     
      console.log("presenter_init.js: Initialization complete.");
  });
  
@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
  // It binds all necessary event listeners using the globally assigned DOM variables.
  // Assumes handler functions are globally available (exposed by their respective files).
  function initializeUIEventListeners() {
-     console.log("presenter_init.js: Binding UI event listeners.");
+     console.log("INIT.JS: Binding UI event listeners.");
  
      // Script Browsing & Loading
      // Assumes scriptSelect, loadSelectedScriptBtn, scriptPathBreadcrumb, scriptBrowseUpBtn are global
@@ -289,18 +289,18 @@ document.addEventListener('DOMContentLoaded', () => {
      if (window.scriptSelect) {
           window.scriptSelect.addEventListener('dblclick', window.handleScriptSelectDblClick);
           window.scriptSelect.addEventListener('change', window.updateLoadButtonState); // Call utility function
-          console.log("presenter_init.js: scriptSelect listeners added.");
-     } else { console.warn("presenter_init.js: scriptSelect element not found, listeners not added."); }
+          console.log("INIT.JS: scriptSelect listeners added.");
+     } else { console.warn("INIT.JS: scriptSelect element not found, listeners not added."); }
  
      if (window.loadSelectedScriptBtn) {
           window.loadSelectedScriptBtn.addEventListener('click', window.handleLoadSelectedScript);
-          console.log("presenter_init.js: loadSelectedScriptBtn click listener added.");
-     } else { console.warn("presenter_init.js: loadSelectedScriptBtn element not found, listener not added."); }
+          console.log("INIT.JS: loadSelectedScriptBtn click listener added.");
+     } else { console.warn("INIT.JS: loadSelectedScriptBtn element not found, listener not added."); }
  
      if (window.scriptBrowseUpBtn) {
           window.scriptBrowseUpBtn.addEventListener('click', window.handleBrowseUp);
-          console.log("presenter_init.js: scriptBrowseUpBtn click listener added.");
-     } else { console.warn("presenter_init.js: scriptBrowseUpBtn element not found, listener not added."); }
+          console.log("INIT.JS: scriptBrowseUpBtn click listener added.");
+     } else { console.warn("INIT.JS: scriptBrowseUpBtn element not found, listener not added."); }
  
      // Breadcrumb links are handled by inline onclick calling window.handleBreadcrumbClick
  
@@ -310,13 +310,13 @@ document.addEventListener('DOMContentLoaded', () => {
      // Assumes handlePrevEvent, handleNextEvent are global handlers.
      if (window.prevEventBtn) {
           window.prevEventBtn.addEventListener('click', window.handlePrevEvent);
-          console.log("presenter_init.js: prevEventBtn click listener added.");
-     } else { console.warn("presenter_init.js: prevEventBtn element not found, listener not added."); }
+          console.log("INIT.JS: prevEventBtn click listener added.");
+     } else { console.warn("INIT.JS: prevEventBtn element not found, listener not added."); }
  
      if (window.nextEventBtn) {
           window.nextEventBtn.addEventListener('click', window.handleNextEvent);
-          console.log("presenter_init.js: nextEventBtn click listener added.");
-     } else { console.warn("presenter_init.js: nextEventBtn element not found, listener not added."); }
+          console.log("INIT.JS: nextEventBtn click listener added.");
+     } else { console.warn("INIT.JS: nextEventBtn element not found, listener not added."); }
  
      // Add keyboard shortcuts (Space/PgDn for next/advance, PgUp for prev)
      // Assumes handleKeyboardShortcuts is a global handler.
@@ -369,9 +369,22 @@ document.addEventListener('DOMContentLoaded', () => {
  
      // Click listener for search results (using event delegation on the container)
      if(window.streamerSearchResultsDiv) {
-          window.streamerSearchResultsDiv.addEventListener('click', window.handleSearchResultClick); // Utility function
+          window.streamerSearchResultsDiv.addEventListener('click', (event) => 
+              window.handleSearchResultClick(event, window.streamerSearchInput, window.streamerSearchResultsDiv)
+          );
           console.log("presenter_init.js: streamerSearchResultsDiv click delegation listener added.");
-     } else { console.warn("presenter_init.js: streamerSearchResultsDiv element not found, listener not added."); }
+     } else { 
+          console.warn("presenter_init.js: streamerSearchResultsDiv element not found, listener not added."); 
+     }
+
+     if (window.reversalSearchResultsDiv) { 
+          window.reversalSearchResultsDiv.addEventListener('click', (event) => 
+              window.handleSearchResultClick(event, window.streamerSearchInputReversal, window.reversalSearchResultsDiv)
+          );
+          console.log("presenter_init.js: reversalSearchResultsDiv click delegation listener added."); 
+     } else { 
+          console.warn("presenter_init.js: reversalSearchResultsDiv element not found, listener not added."); 
+     }
  
  
      if (window.fetchWelcomeDanmakuBtn) {
@@ -386,8 +399,21 @@ document.addEventListener('DOMContentLoaded', () => {
  
      if (window.fetchReversalBtn) {
           window.fetchReversalBtn.addEventListener('click', window.handleFetchReversal); // Handler defined in danmaku_handlers
-          console.log("presenter_init.js: fetchReversalBtn click listener added.");
-     } else { console.warn("presenter_init.js: fetchReversalBtn element not found, listener not added."); }
+          console.log("INIT.JS: Found fetchReversalBtn element."); 
+          window.fetchReversalBtn.addEventListener('click', function() { 
+              console.log("INIT.JS: fetchReversalBtn CLICKED!"); 
+              if (typeof window.handleFetchReversalData === 'function') { 
+                  console.log("INIT.JS: window.handleFetchReversalData is a function. Calling it now."); 
+                  window.handleFetchReversalData(); 
+              } else { 
+                  console.error("INIT.JS: CRITICAL - window.handleFetchReversalData is NOT a function!"); 
+                  if(typeof window.updateStatus === 'function') window.updateStatus("获取反转语录功能配置错误 (init)。", "error"); 
+              } 
+          }); 
+          console.log("INIT.JS: fetchReversalBtn click listener ADDED to call handleFetchReversalData."); 
+     } else { 
+          console.warn("INIT.JS: fetchReversalBtn element NOT FOUND, listener not added."); 
+     }
  
      if (window.fetchCaptionsBtn) {
           window.fetchCaptionsBtn.addEventListener('click', window.handleFetchCaptions); // Handler defined in danmaku_handlers
@@ -418,4 +444,22 @@ document.addEventListener('DOMContentLoaded', () => {
  
  
  console.log("presenter_init.js loaded and finished execution.");
+
+ // 获取新的 DOM 元素
+ window.streamerSearchInputReversal = document.getElementById('streamer_search_input_reversal'); 
+ window.reversalSearchResultsDiv = document.getElementById('reversal_search_results'); 
+ // Log acquisition status for these new elements 
+ console.log("streamerSearchInputReversal:", window.streamerSearchInputReversal ? "Found" : "Not Found"); 
+ console.log("reversalSearchResultsDiv:", window.reversalSearchResultsDiv ? "Found" : "Not Found");
+
+ // 为新的输入框添加输入事件监听器
+ if (window.streamerSearchInputReversal) {
+     window.streamerSearchInputReversal.addEventListener('input', window.handleReversalStreamerSearchInput);
+     console.log("presenter_init.js: streamerSearchInputReversal input listener added.");
+ } else {
+     console.warn("presenter_init.js: streamerSearchInputReversal element not found, listener not added.");
+ }
+ 
+ // 确保文件末尾没有多余的 fetchReversalBtn 绑定代码
+ // 原有的多余代码已被删除或注释掉，这里不会再出现相关代码
  

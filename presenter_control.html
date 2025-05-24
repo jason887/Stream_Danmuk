@@ -61,7 +61,7 @@
          }
 
         /* Adjust search-container to only wrap the first input and its results */
-        .danmaku-section .search-container { 
+        .search-container {
             position: relative; 
             flex-grow: 1; 
             min-width: 150px;
@@ -274,13 +274,13 @@
 
     </div> <!-- end .container -->
 
-    <script src="/static/presenter_core.js" defer></script> <!-- Core first --> 
-    <script src="/static/presenter_dom_vars.js" defer></script> <!-- Declare DOM variables --> 
-    <script src="/static/presenter_ui_utils.js" defer></script> <!-- Utility functions (depend on dom_vars, core) --> 
-    <script src="/static/presenter_script_handlers.js" defer></script> <!-- Script handlers (depend on dom_vars, core, ui_utils) --> 
-    <script src="/static/presenter_roast_handlers.js" defer></script> <!-- Roast handlers (depend on dom_vars, core, ui_utils) --> 
-    <script src="/static/presenter_danmaku_handlers.js" defer></script> <!-- Danmaku handlers (depend on dom_vars, core, ui_utils) --> 
-    <script src="/static/presenter_init.js" defer></script> <!-- Main initializer (depends on all others) -->
+    <script src="/static/presenter_core.js" defer></script> 
+    <script src="/static/presenter_dom_vars.js" defer></script> 
+    <script src="/static/presenter_ui_utils.js" defer></script> 
+    <script src="/static/presenter_script_handlers.js" defer></script> 
+    <script src="/static/presenter_roast_handlers.js" defer></script> 
+    <script src="/static/presenter_danmaku_handlers.js" defer></script> 
+    <script src="/static/presenter_init.js" defer></script> 
 
     <div style="display: flex; align-items: center; margin-bottom: 10px;">
       <span class="status-indicator disconnected" style="width: 12px; height: 12px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 8px;"></span>

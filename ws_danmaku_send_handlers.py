@@ -44,20 +44,20 @@ async def _send_danmaku_group(danmaku_list, danmaku_type_label, websocket=None, 
     if websocket:
         await websocket.send(json.dumps({"type": "info", "message": f"发送 {len(danmaku_list)} 条{danmaku_type_label}弹幕...", "context": f"auto_send_{danmaku_type_label}_group"}))
 
-    is_roast = (danmaku_type_label.lower().startswith("吐槽") or danmaku_type_label.lower().startswith("怼人")) 
-    duration_to_use = specific_duration_ms if specific_duration_ms is not None else AUTO_SEND_DURATION_MS 
-    sent_count = 0 
+    is_roast = (danmaku_type_label.lower().startswith("吐槽") or danmaku_type_label.lower().startswith("怼人"))
+    duration_to_use = specific_duration_ms if specific_duration_ms is not None else AUTO_SEND_DURATION_MS
+    sent_count = 0
 
-    for i, raw_text in enumerate(danmaku_list): # raw_text 现在应该是已经处理好的文本 
-        if not isinstance(raw_text, str) or not raw_text.strip(): 
-            logging.warning(f"ws_danmaku_send_handlers: 跳过无效的 {danmaku_type_label} 弹幕条目 (已处理过): {raw_text}") 
-            continue 
-        
-        processed_text = raw_text # 直接使用，因为已在 auto_send_boss_danmaku_flow 中处理 
+    for i, raw_text in enumerate(danmaku_list): # raw_text 现在应该是已经处理好的文本
+        if not isinstance(raw_text, str) or not raw_text.strip():
+            logging.warning(f"ws_danmaku_send_handlers: 跳过无效的 {danmaku_type_label} 弹幕条目 (已处理过): {raw_text}")
+            continue
 
-        danmaku_message = { 
-            "type": "danmaku", "text": processed_text, "duration_ms": duration_to_use, 
-            "is_roast": is_roast, "timestamp": time.time() 
+        processed_text = raw_text # 直接使用，因为已在 auto_send_boss_danmaku_flow 中处理
+
+        danmaku_message = {
+            "type": "danmaku", "text": processed_text, "duration_ms": duration_to_use,
+            "is_roast": is_roast, "timestamp": time.time()
         }
         try:
             if _broadcast_message:
@@ -110,11 +110,11 @@ async def handle_auto_send_danmaku(websocket, data):
         if db is None:
             logging.error(f"ws_danmaku_send_handlers: DB connection lost before fetching danmaku for {streamer_name}.")
             await websocket.send(json.dumps({"type": "error", "message": "数据库连接丢失。", "context": "auto_send_db_fetch_error"}))
-            # Re-enable buttons on error 
+            # Re-enable buttons on error
             await websocket.send(json.dumps({"type": "re_enable_auto_send_buttons", "context": "auto_send_db_fetch_error_reenable"}))
-            return # 直接返回，因为没有数据库连接无法继续 
+            return # 直接返回，因为没有数据库连接无法继续
 
-        # --- 获取欢迎弹幕 --- 
+        # --- 获取欢迎弹幕 ---
         welcome_collection = db[db_config.WELCOME_COLLECTION]
         # 修改查询条件和字段名
         welcome_query = {"streamer_name": {"$regex": f"^{re.escape(streamer_name)}$", "$options": "i"}}
@@ -132,7 +132,7 @@ async def handle_auto_send_danmaku(websocket, data):
         else:
             logging.info(f"ws_danmaku_send_handlers: No 'welcome' danmaku document found for '{streamer_name}'.")
 
-        # --- 获取吐槽弹幕 --- 
+        # --- 获取吐槽弹幕 ---
         mock_collection = db[db_config.MOCK_COLLECTION]
         # 修改查询条件和字段名
         roast_query = {"streamer_name": {"$regex": f"^{re.escape(streamer_name)}$", "$options": "i"}}
@@ -150,22 +150,22 @@ async def handle_auto_send_danmaku(websocket, data):
         else:
             logging.info(f"ws_danmaku_send_handlers: No 'roast' (mock) danmaku document found for '{streamer_name}'.")
 
-        # --- 后续发送逻辑 --- 
+        # --- 后续发送逻辑 ---
         if not welcome_danmaku_list_to_send and not roast_danmaku_list_to_send:
             logging.warning(f"ws_danmaku_send_handlers: No welcome or mock danmaku to send for streamer '{streamer_name}'.")
-            await websocket.send(json.dumps({ 
-                "type": "warning", "message": f"未找到 {streamer_name} 的欢迎或吐槽弹幕可供发送。", 
-                "action": "auto_send_danmaku", "context": "auto_send_no_data_to_construct" 
-            })) 
+            await websocket.send(json.dumps({
+                "type": "warning", "message": f"未找到 {streamer_name} 的欢迎或吐槽弹幕可供发送。",
+                "action": "auto_send_danmaku", "context": "auto_send_no_data_to_construct"
+            }))
             return
 
         logging.info(f"ws_danmaku_send_handlers: Starting auto-send for '{streamer_name}'. Welcome: {len(welcome_danmaku_list_to_send)}, Mock: {len(roast_danmaku_list_to_send)}")
         await websocket.send(json.dumps({"type": "info", "message": f"开始自动发送 {streamer_name} 的弹幕...", "context": "auto_send_starting"}))
-        await websocket.send(json.dumps({"type": "auto_send_started", "context": "auto_send_started"})) # 前端可以用这个消息来禁用按钮 
+        await websocket.send(json.dumps({"type": "auto_send_started", "context": "auto_send_started"})) # 前端可以用这个消息来禁用按钮
 
         if welcome_danmaku_list_to_send:
             await _send_danmaku_group(welcome_danmaku_list_to_send, "欢迎", websocket, target_name=streamer_name)
-            if roast_danmaku_list_to_send: # 只有在欢迎弹幕发送后且有吐槽弹幕时才暂停 
+            if roast_danmaku_list_to_send: # 只有在欢迎弹幕发送后且有吐槽弹幕时才暂停
                  logging.info(f"ws_danmaku_send_handlers: Pausing {GROUP_PAUSE_MS/1000}s before mock group.")
                  await asyncio.sleep(GROUP_PAUSE_MS / 1000)
         if roast_danmaku_list_to_send:
@@ -184,8 +184,17 @@ async def handle_auto_send_danmaku(websocket, data):
         # 确保按钮在任何情况下都会重新启用
         await websocket.send(json.dumps({"type": "re_enable_auto_send_buttons", "context": "auto_send_finally_reenable"}))
 
+def _boss_task_done_callback(task):
+    try:
+        task.result() # 如果任务有异常，这里会重新抛出
+        logging.info(f"Boss danmaku task {task.get_name()} completed successfully.")
+    except asyncio.CancelledError:
+        logging.info(f"Boss danmaku task {task.get_name()} was cancelled.")
+    except Exception as e:
+        logging.error(f"Boss danmaku task {task.get_name()} failed with exception: {e}", exc_info=True)
+
 async def handle_send_boss_danmaku(websocket, data):
-    global current_boss_danmaku_task 
+    global current_boss_danmaku_task
     presenter_addr = f"{websocket.remote_address}" if websocket else "N/A"
     logging.info(f"ws_danmaku_send_handlers: Received send_boss_danmaku action from {presenter_addr} with data: {data}")
     if _broadcast_message is None:
@@ -202,7 +211,7 @@ async def handle_send_boss_danmaku(websocket, data):
     danmaku_type = data.get("danmaku_type")
     boss_name = data.get("boss_name")
     gift_name = data.get("gift_name", "")
-    desired_total_count = 30 # 确保这里定义了 
+    desired_total_count = 30 # 确保这里定义了
 
     if danmaku_type not in ["welcome_boss", "thanks_boss_gift"]:
         logging.warning(f"ws_danmaku_send_handlers: Invalid danmaku_type: {danmaku_type} from {presenter_addr}")
@@ -220,142 +229,136 @@ async def handle_send_boss_danmaku(websocket, data):
           await websocket.send(json.dumps({"type": "re_enable_auto_send_buttons", "context": "send_boss_missing_gift_reenable"}))
           return
 
-    # 如果已有任务在运行，取消它 
-    if current_boss_danmaku_task and not current_boss_danmaku_task.done(): 
-        logging.info(f"Cancelling previous boss danmaku task for {current_boss_danmaku_task.get_name()} before starting new one for {boss_name}") 
-        current_boss_danmaku_task.cancel() 
-        try: 
-            await current_boss_danmaku_task 
-        except asyncio.CancelledError: 
-            logging.info(f"Previous boss danmaku task {current_boss_danmaku_task.get_name()} was cancelled successfully.") 
-        except Exception as e: 
-            logging.error(f"Error awaiting previous cancelled boss task: {e}") 
-    
-    # 创建新的发送任务 
-    # asyncio.create_task() 的 name 参数在 Python 3.8+ 可用 
-    new_task_name = f"boss_danmaku_for_{boss_name}" 
-    current_boss_danmaku_task = asyncio.create_task( 
-        auto_send_boss_danmaku_flow(websocket, boss_name, gift_name, danmaku_type, desired_total_count), # 传递 desired_total_count 
-        name=new_task_name 
-    ) 
-    logging.info(f"Created new boss danmaku task: {new_task_name}") 
+    # 如果已有任务在运行，取消它
+    if current_boss_danmaku_task and not current_boss_danmaku_task.done():
+        logging.info(f"Cancelling previous boss danmaku task for {current_boss_danmaku_task.get_name()} before starting new one for {boss_name}")
+        current_boss_danmaku_task.cancel()
+        try:
+            await current_boss_danmaku_task
+        except asyncio.CancelledError:
+            logging.info(f"Previous boss danmaku task {current_boss_danmaku_task.get_name()} was cancelled successfully.")
+        except Exception as e:
+            logging.error(f"Error awaiting previous cancelled boss task: {e}")
+
+    # 创建新的发送任务
+    # asyncio.create_task() 的 name 参数在 Python 3.8+ 可用
+    new_task_name = f"boss_danmaku_for_{boss_name}"
+    current_boss_danmaku_task = asyncio.create_task(
+        auto_send_boss_danmaku_flow(websocket, boss_name, gift_name, danmaku_type, desired_total_count),
+        name=new_task_name
+    )
+    current_boss_danmaku_task.add_done_callback(_boss_task_done_callback)
+    logging.info(f"Created new boss danmaku task: {new_task_name}")
     await websocket.send(json.dumps({"type": "auto_send_started", "message": f"开始发送 {danmaku_type} 弹幕...", "context": f"send_boss_{danmaku_type}_started"}))
 
-async def auto_send_boss_danmaku_flow(websocket, boss_name, gift_name, danmaku_type, desired_total_count): 
-    collection_name = "" 
-    danmaku_type_label = "" 
-    db_field_name = "" # 字段名将在这里根据类型确定 
 
-    if danmaku_type == "welcome_boss": 
-        collection_name = db_config.BIG_BROTHERS_COLLECTION 
-        danmaku_type_label = "欢迎大哥" 
-        db_field_name = "welcome_text" # 这个是正确的 
-    elif danmaku_type == "thanks_boss_gift": 
-        collection_name = db_config.GIFT_THANKS_COLLECTION 
-        danmaku_type_label = "感谢大哥礼物" 
-        db_field_name = "danmaku_text" # 修改这里，从 "template" 改为 "danmaku_text" 
-    else: 
-        logging.error(f"ws_danmaku_send_handlers: Invalid danmaku_type '{danmaku_type}' in auto_send_boss_danmaku_flow.") 
-        if websocket: 
-            await websocket.send(json.dumps({"type": "error", "message": "内部错误：无效的大哥弹幕类型。", "context": "send_boss_internal_type_error"})) 
-        return 
+async def auto_send_boss_danmaku_flow(websocket, boss_name, gift_name, danmaku_type, desired_total_count):
+    task_name = asyncio.current_task().get_name() if hasattr(asyncio.current_task(), 'get_name') else "UnknownTask"
+    logging.info(f"Task {task_name}: auto_send_boss_danmaku_flow STARTED for {boss_name}, type {danmaku_type}")
+    collection_name = ""
+    danmaku_type_label = ""
+    db_field_name = ""
 
-    try: 
-        db_manager = get_db_manager() 
-        db = db_manager.get_db() if db_manager and db_manager.is_connected() else None 
-        if db is None: 
-            logging.error(f"ws_danmaku_send_handlers: DB connection lost before fetching {danmaku_type_label} templates for {boss_name}.") 
-            if websocket: 
-                await websocket.send(json.dumps({"type": "error", "message": "数据库连接丢失。", "context": "send_boss_db_fetch_error"})) 
-            # 按钮应该在 finally 中统一处理 re-enable 
-            return # 修改：如果数据库连接丢失，直接返回，finally会处理按钮 
+    if danmaku_type == "welcome_boss":
+        collection_name = db_config.BIG_BROTHERS_COLLECTION
+        danmaku_type_label = "欢迎大哥"
+        db_field_name = "welcome_text"
+    elif danmaku_type == "thanks_boss_gift":
+        collection_name = db_config.GIFT_THANKS_COLLECTION
+        danmaku_type_label = "感谢大哥礼物"
+        db_field_name = "danmaku_text"
+    else:
+        logging.error(f"Task {task_name}: ws_danmaku_send_handlers: Invalid danmaku_type '{danmaku_type}' in auto_send_boss_danmaku_flow.")
+        if websocket:
+            await websocket.send(json.dumps({"type": "error", "message": "内部错误：无效的大哥弹幕类型。", "context": "send_boss_internal_type_error"}))
+        logging.info(f"Task {task_name}: Invalid danmaku type, RETURNING.")
+        return
 
-        mongo_collection = db[collection_name] 
-        # 获取所有不为空的模板 
-        unique_danmaku_templates_raw = mongo_collection.distinct(db_field_name) 
-        unique_danmaku_templates = [tpl for tpl in unique_danmaku_templates_raw if isinstance(tpl, str) and tpl.strip()] 
+    try: # This is the main try block for the entire flow
+        db_manager = get_db_manager()
+        logging.info(f"Task {task_name}: BEFORE checking DB connection")
+        db = db_manager.get_db() if db_manager and db_manager.is_connected() else None
+        logging.info(f"Task {task_name}: AFTER checking DB connection")
+        if db is None:
+            logging.error(f"Task {task_name}: ws_danmaku_send_handlers: DB connection lost before fetching {danmaku_type_label} templates for {boss_name}.")
+            if websocket:
+                await websocket.send(json.dumps({"type": "error", "message": "数据库连接丢失。", "context": "send_boss_db_fetch_error"}))
+            logging.info(f"Task {task_name}: DB connection lost, RETURNING.")
+            return
 
-        if not unique_danmaku_templates: 
-            logging.info(f"ws_danmaku_send_handlers: No *valid* unique '{danmaku_type_label}' danmaku found in collection '{collection_name}'.") 
-            if websocket: 
-                await websocket.send(json.dumps({"type": "info", "message": f"数据库中没有找到可用的{danmaku_type_label}弹幕。", "context": f"send_boss_{danmaku_type}_empty"})) 
-            return # 修改：如果没有模板，直接返回，finally会处理按钮 
+        mongo_collection = db[collection_name]
+        # 获取所有不为空的模板
+        logging.info(f"Task {task_name}: BEFORE fetching distinct danmaku templates")
+        unique_danmaku_templates_raw = mongo_collection.distinct(db_field_name)
+        logging.info(f"Task {task_name}: AFTER fetching distinct danmaku templates")
+        unique_danmaku_templates = [tpl for tpl in unique_danmaku_templates_raw if isinstance(tpl, str) and tpl.strip()]
 
-        logging.info(f"ws_danmaku_send_handlers: Fetched {len(unique_danmaku_templates)} *valid* unique '{danmaku_type_label}' templates for {boss_name}.") 
-        
-        processed_danmaku_list = [] 
-        # 准备 desired_total_count (30) 条弹幕 
-        temp_template_list = [] 
-        if len(unique_danmaku_templates) >= desired_total_count: 
-            random.shuffle(unique_danmaku_templates) 
-            temp_template_list = unique_danmaku_templates[:desired_total_count] 
-        else: 
-            # 如果模板不足，循环使用 
-            for i in range(desired_total_count): 
-                temp_template_list.append(unique_danmaku_templates[i % len(unique_danmaku_templates)]) 
-        
-        # 进行占位符替换 
-        for raw_template in temp_template_list: 
-            processed_text = raw_template 
-            s_boss_name = str(boss_name) if boss_name else "大哥" # 默认值 
-            s_gift_name = str(gift_name) if gift_name else "礼物" # 默认值 
+        if not unique_danmaku_templates:
+            logging.info(f"Task {task_name}: ws_danmaku_send_handlers: No *valid* unique '{danmaku_type_label}' danmaku found in collection '{collection_name}'.")
+            if websocket:
+                await websocket.send(json.dumps({"type": "info", "message": f"数据库中没有找到可用的{danmaku_type_label}弹幕。", "context": f"send_boss_{danmaku_type}_empty"}))
+            logging.info(f"Task {task_name}: No valid templates, RETURNING.")
+            return
 
-            if danmaku_type == "welcome_boss": 
-                # 欢迎大哥：只替换 boss_name 
-                processed_text = processed_text.replace("{}", s_boss_name, 1) 
-                if "{}" in processed_text: 
-                    logging.warning(f"ws_danmaku_send_handlers: Welcome boss template '{raw_template}' still contains '{{}}' after replacing boss_name: '{processed_text}'") 
-            
-            elif danmaku_type == "thanks_boss_gift": 
-                # 感谢大哥礼物：模板通常是 "感谢{大哥名}的{礼物名}..." 
-                # 按顺序替换：第一个 {} 是 boss_name，第二个 {} 是 gift_name 
-                
-                # 先替换第一个 {} 为 boss_name 
-                if "{}" in processed_text: 
-                    processed_text = processed_text.replace("{}", s_boss_name, 1) 
-                else: # 如果模板本身没有占位符，或者第一个已被意外处理（不太可能） 
-                    logging.warning(f"ws_danmaku_send_handlers: Thanks gift template '{raw_template}' did not have a first '{{}}' for boss_name.") 
+        logging.info(f"Task {task_name}: ws_danmaku_send_handlers: Fetched {len(unique_danmaku_templates)} *valid* unique '{danmaku_type_label}' templates for {boss_name}.")
 
-                # 再替换（可能存在的）第二个 {} 为 gift_name 
-                if "{}" in processed_text: 
-                    processed_text = processed_text.replace("{}", s_gift_name, 1) 
-                elif s_gift_name: # 如果有礼物名但模板中没有第二个占位符了 
-                    logging.warning(f"ws_danmaku_send_handlers: Thanks gift template '{raw_template}' (after boss_name replace: '{processed_text}') did not have a second '{{}}' for gift_name '{s_gift_name}'.") 
+        processed_danmaku_list = []
+        # 准备 desired_total_count (30) 条弹幕
+        temp_template_list = []
+        if len(unique_danmaku_templates) >= desired_total_count:
+            random.shuffle(unique_danmaku_templates)
+            temp_template_list = unique_danmaku_templates[:desired_total_count]
+        else:
+            # 如果模板不足，循环使用
+            for i in range(desired_total_count):
+                temp_template_list.append(unique_danmaku_templates[i % len(unique_danmaku_templates)])
 
-                # 如果替换完两者后，模板中仍然有 "{}" (例如模板设计错误，有超过2个占位符) 
-                if "{}" in processed_text: 
-                    logging.warning(f"ws_danmaku_send_handlers: Thanks gift template '{raw_template}' still contains '{{}}' after targeted replacements: '{processed_text}'. Original boss: '{boss_name}', gift: '{gift_name}'") 
-                    # 可以选择一个默认替换，或者直接保留未替换的占位符 
-                    processed_text = processed_text.replace("{}", "支持", 1) # 最后的补救替换 
+        # 进行占位符替换
+        for raw_template in temp_template_list:
+            processed_text = raw_template
+            s_boss_name = str(boss_name) if boss_name else "大哥" # 默认值
+            s_gift_name = str(gift_name) if gift_name else "礼物" # 默认值
 
-            if processed_text.strip(): 
-                processed_danmaku_list.append(processed_text) 
-            else: 
-                logging.warning(f"ws_danmaku_send_handlers: Template '{raw_template}' resulted in empty string after processing for {danmaku_type_label}.") 
+            if danmaku_type == "welcome_boss":
+                # 欢迎大哥：只替换 boss_name
+                processed_text = processed_text.replace("{}", s_boss_name, 1)
+                if "{}" in processed_text:
+                    logging.warning(f"Task {task_name}: ws_danmaku_send_handlers: Welcome boss template '{raw_template}' still contains '{{}}' after replacing boss_name: '{processed_text}'")
 
-        if not processed_danmaku_list: 
-            logging.warning(f"ws_danmaku_send_handlers: No processable danmaku after placeholder replacement for {danmaku_type_label}.") 
-            if websocket: 
-                await websocket.send(json.dumps({"type": "info", "message": f"未能生成有效的{danmaku_type_label}弹幕。", "context": f"send_boss_{danmaku_type}_processing_fail"})) 
-            return 
+            elif danmaku_type == "thanks_boss_gift":
+                # 感谢大哥礼物：模板通常是 "感谢{大哥名}的{礼物名}..."
+                # 按顺序替换：第一个 {} 是 boss_name，第二个 {} 是 gift_name
 
-        logging.info(f"ws_danmaku_send_handlers: Constructed list of {len(processed_danmaku_list)} '{danmaku_type_label}' danmaku for {boss_name} to send.") 
+                # 先替换第一个 {} 为 boss_name
+                if "{}" in processed_text:
+                    processed_text = processed_text.replace("{}", s_boss_name, 1)
+                else: # 如果模板本身没有占位符，或者第一个已被意外处理（不太可能）
+                    logging.warning(f"Task {task_name}: ws_danmaku_send_handlers: Thanks gift template '{raw_template}' did not have a first '{{}}' for boss_name.")
 
-        # 分成两组发送 
-        group_size = len(processed_danmaku_list) // 2 
-        group1 = processed_danmaku_list[:group_size] 
+                # 再替换（可能存在的）第二个 {} 为 gift_name
+                if "{}" in processed_text:
+                    processed_text = processed_text.replace("{}", s_gift_name, 1)
+            processed_danmaku_list.append(processed_text)
+
+        if not processed_danmaku_list:
+            logging.info(f"Task {task_name}: No processed danmaku, RETURNING EARLY.")
+            return
+
+        # 分成两组发送
+        group_size = len(processed_danmaku_list) // 2
+        group1 = processed_danmaku_list[:group_size]
         group2 = processed_danmaku_list[group_size:]
 
         if group1:
             logging.info(f"ws_danmaku_send_handlers: Sending Group 1 ({len(group1)} items) of '{danmaku_type_label}' for {boss_name} with {BOSS_GIFT_DANMAKU_DURATION_MS}ms duration each...")
             await _send_danmaku_group(group1, danmaku_type_label, websocket, boss_name, gift_name, specific_duration_ms=BOSS_GIFT_DANMAKU_DURATION_MS)
-        
+
         if group2:
             logging.info(f"ws_danmaku_send_handlers: Pausing for {GROUP_PAUSE_MS / 1000} seconds between groups before sending group2 for {boss_name}.")
             await asyncio.sleep(GROUP_PAUSE_MS / 1000)
             logging.info(f"ws_danmaku_send_handlers: Sending Group 2 ({len(group2)} items) of '{danmaku_type_label}' for {boss_name} with {BOSS_GIFT_DANMAKU_DURATION_MS}ms duration each...")
             await _send_danmaku_group(group2, danmaku_type_label, websocket, boss_name, gift_name, specific_duration_ms=BOSS_GIFT_DANMAKU_DURATION_MS)
-        
+
         logging.info(f"ws_danmaku_send_handlers: Auto-send sequence for '{boss_name}' {danmaku_type_label} finished.")
         if websocket:
             await websocket.send(json.dumps({"type": "success", "message": f"{danmaku_type_label}弹幕自动发送完成。", "context": f"send_boss_{danmaku_type}_finished"}))

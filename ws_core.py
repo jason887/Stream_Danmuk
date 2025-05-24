@@ -102,38 +102,43 @@ async def unregister_client(websocket):
     addr = websocket.remote_address
     removed_from_presenter = False
     removed_from_audience = False
+    # 在函数开始处添加日志
+    logging.info(f"ws_core: 开始处理客户端 {addr} 的注销操作。当前主播客户端数量: {len(PRESENTER_CLIENTS)}，当前观众客户端数量: {len(AUDIENCE_CLIENTS)}，主播客户端地址: {[client.remote_address for client in PRESENTER_CLIENTS]}，观众客户端地址: {[client.remote_address for client in AUDIENCE_CLIENTS]}")
 
     if websocket in PRESENTER_CLIENTS:
         try:
             PRESENTER_CLIENTS.remove(websocket)
             removed_from_presenter = True
-            logging.info(f"ws_core: Presenter client {addr} removed. Total presenters: {len(PRESENTER_CLIENTS)}")
+            logging.info(f"ws_core: 主播客户端 {addr} 已移除。当前主播客户端数量: {len(PRESENTER_CLIENTS)}，当前主播客户端地址: {[client.remote_address for client in PRESENTER_CLIENTS]}")
         except KeyError:
-            logging.debug(f"ws_core: Presenter client {addr} not found in set during unregister (already removed).")
+            logging.debug(f"ws_core: 主播客户端 {addr} 在注销时未在集合中找到（可能已被移除）。")
 
     if websocket in AUDIENCE_CLIENTS:
         try:
             AUDIENCE_CLIENTS.remove(websocket)
             removed_from_audience = True
-            logging.info(f"ws_core: Audience client {addr} removed. Total audience: {len(AUDIENCE_CLIENTS)}")
+            logging.info(f"ws_core: 观众客户端 {addr} 已移除。当前观众客户端数量: {len(AUDIENCE_CLIENTS)}，当前观众客户端地址: {[client.remote_address for client in AUDIENCE_CLIENTS]}")
         except KeyError:
-            logging.debug(f"ws_core: Audience client {addr} not found in set during unregister (already removed).")
+            logging.debug(f"ws_core: 观众客户端 {addr} 在注销时未在集合中找到（可能已被移除）。")
 
     if not removed_from_presenter and not removed_from_audience:
-        logging.info(f"ws_core: Unregistered or unknown client disconnected: {addr}")
+        logging.info(f"ws_core: 未注册或未知客户端断开连接: {addr}")
     else:
-        logging.info(f"ws_core: Client {addr} disconnect handling finished.")
+        logging.info(f"ws_core: 客户端 {addr} 断开连接处理完成。")
 
     # Clear presenter-specific states if it was a presenter
     if removed_from_presenter:
         try:
              from ws_script_handlers import clear_presenter_browse_path
              clear_presenter_browse_path(websocket)
-             logging.debug(f"ws_core: Cleared script browse path for presenter {addr}.")
+             logging.debug(f"ws_core: 已清除主播 {addr} 的脚本浏览路径。")
         except ImportError:
-             logging.debug("ws_core: ws_script_handlers or clear_presenter_browse_path not available for cleanup.")
+             logging.debug("ws_core: ws_script_handlers 或 clear_presenter_browse_path 不可用于清理。")
         except Exception as e:  # 明确捕获异常类型
-            logging.debug(f"ws_core: An unexpected error occurred during cleanup: {e}")  # 添加缩进的代码块
+            logging.debug(f"ws_core: 清理过程中发生意外错误: {e}")  # 添加缩进的代码块
+    
+    # 在函数结束处添加日志
+    logging.info(f"ws_core: 客户端 {addr} 的注销操作处理结束。当前主播客户端数量: {len(PRESENTER_CLIENTS)}，当前观众客户端数量: {len(AUDIENCE_CLIENTS)}，主播客户端地址: {[client.remote_address for client in PRESENTER_CLIENTS]}，观众客户端地址: {[client.remote_address for client in AUDIENCE_CLIENTS]}")
 
 
 async def dispatch_message(websocket, data): 

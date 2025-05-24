@@ -85,7 +85,8 @@ async function handleStreamerSearchInput() {
     try {
         // Assumes fetch is available (standard browser API)
         // Use the API endpoint that searches the DB directly
-        const response = await fetch(`/api/search_streamer_names?term=${encodeURIComponent(term)}`); // Corrected API endpoint
+        // 修改 fetch URL
+        const response = await fetch(`/api/search_streamers?term=${encodeURIComponent(term)}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -354,3 +355,117 @@ window.handleAntiFanQuotesListMessage = handleAntiFanQuotesListMessage; // Calle
 window.handleAutoSendFetchedDanmaku = handleAutoSendFetchedDanmaku; // Called by button click
 
 console.log("presenter_danmaku_handlers.js loaded.");
+
+
+/** 
+ * 处理反转区主播名的搜索逻辑 
+ * 调用 API 并更新 reversalSearchResultsDiv 
+ */ 
+async function handleReversalStreamerSearchInput() { 
+    if (!window.streamerSearchInputReversal || !window.reversalSearchResultsDiv) { 
+        console.warn("Danmaku_Handlers: Missing DOM elements for reversal streamer search."); 
+        return; 
+    } 
+    const term = window.streamerSearchInputReversal.value.trim(); 
+    const resultsDiv = window.reversalSearchResultsDiv; 
+    resultsDiv.innerHTML = ''; 
+    if (!term) { 
+        resultsDiv.style.display = 'none'; 
+        return; 
+    } 
+    try { 
+        const response = await fetch(`/api/search_streamers?term=${encodeURIComponent(term)}`); 
+        if (!response.ok) { 
+            console.error(`Danmaku_Handlers: HTTP error! status: ${response.status}`, await response.text()); 
+            resultsDiv.style.display = 'none'; 
+            return; 
+        } 
+        const names = await response.json(); 
+        console.log("Danmaku_Handlers: Reversal search API response:", names); 
+        if (names && names.length > 0) { 
+            resultsDiv.style.display = 'block'; 
+            names.forEach(name => { 
+                const resultItem = document.createElement('div'); 
+                resultItem.classList.add('search-result-item'); 
+                resultItem.textContent = name; 
+                resultsDiv.appendChild(resultItem); 
+            }); 
+        } else { 
+            resultsDiv.innerHTML = ''; 
+            const noResultItem = document.createElement('div'); 
+            noResultItem.textContent = "未找到匹配项"; 
+            noResultItem.style.fontStyle = "italic"; 
+            noResultItem.style.color = "#888"; 
+            noResultItem.style.cursor = "default"; 
+            noResultItem.style.padding = "8px"; 
+            resultsDiv.appendChild(noResultItem); 
+            resultsDiv.style.display = 'block'; 
+        } 
+    } catch (error) { 
+        console.error('Danmaku_Handlers: 搜索反转区主播名时出错:', error); 
+        if (typeof window.updateStatus === 'function') { 
+            window.updateStatus('搜索主播名时出错。', 'error'); 
+        } 
+        resultsDiv.innerHTML = ''; 
+        resultsDiv.style.display = 'none'; 
+    } 
+} 
+window.handleReversalStreamerSearchInput = handleReversalStreamerSearchInput; // 确保暴露 
+
+/** 
+ * 读取 streamerSearchInputReversal 的值并发送 fetch_reversal WebSocket 消息 
+ * 这是专门为 "获取反转语录" 按钮设计的函数 
+ */ 
+function handleFetchReversalData() { 
+    console.log("Danmaku_Handlers: handleFetchReversalData CALLED!"); 
+    if (!window.streamerSearchInputReversal) { 
+        console.warn("Danmaku_Handlers: Missing streamerSearchInputReversal DOM element for fetch_reversal."); 
+        return; 
+    } 
+    const streamerName = window.streamerSearchInputReversal.value.trim(); 
+    console.log("Danmaku_Handlers: Streamer name for reversal fetch is:", `'${streamerName}'`); 
+
+    if (!streamerName) { 
+        console.warn("Danmaku_Handlers: Streamer name is EMPTY. Aborting fetch_reversal."); 
+        if (typeof window.updateStatus === 'function') window.updateStatus("请先通过上方输入框搜索并选择一个主播名，然后再获取反转语录。", "warning"); 
+        if (window.streamerSearchInputReversal) window.streamerSearchInputReversal.focus(); 
+        return; 
+    } 
+
+    if (typeof window.sendMessage === 'function') { 
+        console.log("Danmaku_Handlers: sendMessage function IS available."); 
+        if (typeof window.updateStatus === 'function') window.updateStatus(`正在获取 ${streamerName} 的反转语录...`, "info"); 
+        if (typeof window.clearOutputArea === 'function') window.clearOutputArea(); 
+
+        const messageToSend = { 
+            action: "fetch_reversal", 
+            streamer_name: streamerName 
+        }; 
+        console.log(`Danmaku_Handlers: Preparing to send WebSocket message for fetch_reversal:`, messageToSend); 
+        window.sendMessage(messageToSend); 
+        console.log("Danmaku_Handlers: WebSocket message supposedly SENT for fetch_reversal."); 
+    } else { 
+        console.error("Danmaku_Handlers: CRITICAL - sendMessage function NOT available for fetch_reversal."); 
+        if (typeof window.updateStatus === 'function') window.updateStatus("WebSocket功能未初始化，无法发送请求。", "error"); 
+    } 
+} 
+// 确保 handleFetchReversalData 正确暴露 
+window.handleFetchReversalData = handleFetchReversalData; 
+
+// ... 其他的 window.handleFetch... 函数暴露 ... 
+// Expose handlers globally via window object 
+window.handleSendBossDanmaku = handleSendBossDanmaku; 
+window.handleStreamerSearchInput = handleStreamerSearchInput; 
+window.handleFetchDanmakuList = handleFetchDanmakuList; // 这个是通用的，用于 welcome 和 roast 
+window.handleFetchReversal = handleFetchReversalData; 
+// window.handleFetchCaptions = handleFetchCaptions; // 假设你有一个 handleFetchCaptions 函数 
+
+// Dispatcher message handlers 
+window.handleDanmakuListMessage = handleDanmakuListMessage; 
+window.handleReversalListMessage = handleReversalListMessage; 
+window.handleCaptionsListMessage = handleCaptionsListMessage; 
+window.handleAntiFanQuotesListMessage = handleAntiFanQuotesListMessage; 
+window.handleAutoSendFetchedDanmaku = handleAutoSendFetchedDanmaku; 
+
+console.log("presenter_danmaku_handlers.js loaded.");
+

@@ -258,32 +258,39 @@ function handleCopyOutputArea() {
 
 // Handles click on a search result item (delegated from results container).
 // event: The click event object.
+// 修改为通用的搜索结果点击处理函数
 function handleSearchResultClick(event) {
-   // Check if the clicked element or its parent is a search result item
-   const resultItem = event.target.closest('.search-result-item');
-   if (resultItem) {
-       if (window.streamerSearchInput) { // Access global var
+    const resultItem = event.target.closest('.search-result-item');
+    if (resultItem) {
+        const parentDiv = resultItem.closest('.search-results');
+        if (parentDiv === window.streamerSearchResultsDiv && window.streamerSearchInput) {
             window.streamerSearchInput.value = resultItem.textContent;
-       }
-       if (window.streamerSearchResultsDiv) { // Access global var
-            window.streamerSearchResultsDiv.style.display = 'none'; // Hide results after selection
-       }
-       console.log(`UI_Utils: Selected streamer/topic: ${resultItem.textContent}`);
-       // Optional: Automatically trigger a fetch based on the selected name?
-       // Depends on desired workflow. Currently, user clicks fetch button after selecting.
-   }
+            window.streamerSearchResultsDiv.style.display = 'none';
+        } else if (parentDiv === window.reversalSearchResultsDiv && window.streamerSearchInputReversal) {
+            window.streamerSearchInputReversal.value = resultItem.textContent;
+            window.reversalSearchResultsDiv.style.display = 'none';
+        }
+        console.log(`UI_Utils: 选择的主播/主题: ${resultItem.textContent}`);
+    }
 }
 
-// Handles global click to hide search results when clicking outside the search container.
-// event: The click event object.
+// 修改为通用的全局点击处理函数
 function handleGlobalClick(event) {
-   if (!window.streamerSearchInput || !window.streamerSearchResultsDiv) return; // Access global vars
-   // Hide search results if the click is outside the search container
-   const searchContainer = window.streamerSearchInput.closest('.search-container'); // Find the parent container
-   if (searchContainer && !searchContainer.contains(event.target)) {
-       window.streamerSearchResultsDiv.style.display = 'none';
-        console.debug("UI_Utils: Hid search results on global click.");
-   }
+    if (window.streamerSearchInput && window.streamerSearchResultsDiv) {
+        const searchContainer = window.streamerSearchInput.closest('.search-container');
+        if (searchContainer && !searchContainer.contains(event.target)) {
+            window.streamerSearchResultsDiv.style.display = 'none';
+            console.debug("UI_Utils: 全局点击时隐藏常规搜索结果。");
+        }
+    }
+
+    if (window.streamerSearchInputReversal && window.reversalSearchResultsDiv) {
+        const searchContainer = window.streamerSearchInputReversal.closest('.search-container');
+        if (searchContainer && !searchContainer.contains(event.target)) {
+            window.reversalSearchResultsDiv.style.display = 'none';
+            console.debug("UI_Utils: 全局点击时隐藏反转搜索结果。");
+        }
+    }
 }
 
 // Helper for updating the simple progress text display
